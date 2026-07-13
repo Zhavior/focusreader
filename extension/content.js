@@ -98,13 +98,17 @@ if (!window.hasInjectedFocusReader) {
     whiteNoise.connect(gainNode);
     gainNode.connect(audioCtx.destination);
 
-    // --- 4. Hyper-Realistic Voice Engine (Backend API) ---
-    // Instead of window.speechSynthesis, we POST to our backend API!
-    let voiceAudio = null;
+    // --- 4. Hyper-Realistic Voice Engine (Audio Queue) ---
+    // Instead of waiting for a massive 5000-character blob, we chunk the text by paragraphs.
+    // The first paragraph plays INSTANTLY, while the rest buffer seamlessly in the background.
     
-    // We add a loading overlay while generating voice
+    let voiceAudio = null;
+    let isPlaying = false;
+    let isQueueActive = true;
+    const audioQueue = [];
+    
     const loadingUI = document.createElement('div');
-    loadingUI.innerText = "Generating hyper-realistic voice...";
+    loadingUI.innerText = "Buffering hyper-realistic voice...";
     Object.assign(loadingUI.style, {
       position: 'fixed',
       top: '20px',
@@ -121,29 +125,71 @@ if (!window.hasInjectedFocusReader) {
     });
     vault.appendChild(loadingUI);
 
-    fetch('http://localhost:3001/api/extension-tts', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      // Note: the backend chunking might take a bit for huge texts, MVP sends the whole thing
-      // Max length limit might apply, so we slice to 10k chars for safety in the extension MVP
-      body: JSON.stringify({ text: rawText.slice(0, 5000), voice: 'premium' })
-    })
-    .then(res => res.blob())
-    .then(blob => {
-      const url = URL.createObjectURL(blob);
-      voiceAudio = new Audio(url);
-      voiceAudio.play();
-      loadingUI.remove();
-    })
-    .catch(err => {
-      console.error("Voice generation failed:", err);
-      loadingUI.innerText = "Error loading voice. (Check if backend is running on 3001)";
-      loadingUI.style.background = "rgba(239, 68, 68, 0.2)";
-      loadingUI.style.border = "1px solid rgba(239, 68, 68, 0.5)";
-      loadingUI.style.color = "#fca5a5";
-    });
+    const chunks = [...validParagraphs];
+    let currentChunkIndex = 0;
+
+    const fetchNextChunk = async () => {
+      if (!isQueueActive || currentChunkIndex >= chunks.length) return;
+      
+      const chunkText = chunks[currentChunkIndex];
+      currentChunkIndex++;
+      
+      try {
+        const res = await fetch('http://localhost:3001/api/extension-tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: chunkText, voice: 'premium' })
+        });
+        
+        if (!res.ok) throw new Error("Backend error");
+        
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        audioQueue.push(url);
+        
+        if (!isPlaying && !isPaused && isQueueActive) {
+          playNextInQueue();
+        }
+        
+        // Immediately start fetching the next chunk in the background
+        fetchNextChunk();
+        
+      } catch (err) {
+        console.error("Voice chunk generation failed:", err);
+        loadingUI.innerText = "Error loading voice. Ensure local backend is running.";
+        loadingUI.style.background = "rgba(239, 68, 68, 0.2)";
+        loadingUI.style.color = "#fca5a5";
+      }
+    };
+
+    const playNextInQueue = () => {
+      if (!isQueueActive) return;
+      
+      if (audioQueue.length === 0) {
+        isPlaying = false;
+        return;
+      }
+      
+      isPlaying = true;
+      const nextUrl = audioQueue.shift();
+      voiceAudio = new Audio(nextUrl);
+      
+      if (loadingUI.parentNode) {
+        loadingUI.remove();
+      }
+      
+      voiceAudio.onended = () => {
+        URL.revokeObjectURL(nextUrl);
+        playNextInQueue();
+      };
+      
+      if (!isPaused) {
+        voiceAudio.play().catch(e => console.error("Playback error:", e));
+      }
+    };
+
+    // Kick off the streaming pipeline
+    fetchNextChunk();
 
     // --- 5. UI Controls ---
     const controlPanel = document.createElement('div');
@@ -207,10 +253,12 @@ if (!window.hasInjectedFocusReader) {
     };
     
     const cleanup = () => {
+      isQueueActive = false;
       if (voiceAudio) {
         voiceAudio.pause();
         voiceAudio = null;
       }
+      audioQueue.forEach(url => URL.revokeObjectURL(url));
       try {
         whiteNoise.disconnect();
         gainNode.disconnect();
