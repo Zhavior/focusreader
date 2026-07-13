@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Card, CardContent } from "@/components/ui/card";
-import { Play, Loader2, Volume2, FastForward, Activity, Upload } from "lucide-react";
+import { Play, Loader2, Volume2, FastForward, Activity, Upload, Download } from "lucide-react";
 import TrackLibrary from "@/components/TrackLibrary";
 import KaraokePlayer from "@/components/KaraokePlayer";
 import { estimateLabel } from "@/lib/duration";
@@ -308,15 +308,26 @@ export default function Dashboard() {
                 )}
                 
                 {audioUrl && (
-                  <Button 
-                    variant="ghost" 
-                    onClick={() => {
-                      setAudioUrl(null);
-                    }}
-                    className="text-neutral-500 hover:text-neutral-300"
-                  >
-                    Generate Another
-                  </Button>
+                  <div className="flex items-center gap-4">
+                    <a href={audioUrl} download="FocusMode.mp3">
+                      <Button 
+                        variant="outline" 
+                        className="border-indigo-500/50 text-indigo-300 hover:bg-indigo-500/10 hover:text-indigo-200 transition-colors"
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Download Audio
+                      </Button>
+                    </a>
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => {
+                        setAudioUrl(null);
+                      }}
+                      className="text-neutral-500 hover:text-neutral-300"
+                    >
+                      Generate Another
+                    </Button>
+                  </div>
                 )}
               </div>
 

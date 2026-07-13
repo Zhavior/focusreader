@@ -15,6 +15,7 @@ export default function VoiceDashboard() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [receivedKb, setReceivedKb] = useState(0);
+  const [isParsing, setIsParsing] = useState(false);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -77,11 +78,41 @@ export default function VoiceDashboard() {
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
-      const content = await file.text();
-      setText(content.slice(0, MAX_CHARS));
-      resetAudio();
-      setStatus("idle");
-      e.target.value = "";
+      
+      try {
+        if (file.name.endsWith(".txt") || file.name.endsWith(".md")) {
+          const content = await file.text();
+          setText(content.slice(0, MAX_CHARS));
+        } else {
+          setIsParsing(true);
+          setErrorMessage(null);
+          
+          const formData = new FormData();
+          formData.append("file", file);
+          
+          const res = await fetch("/api/parse", {
+            method: "POST",
+            body: formData,
+          });
+          
+          if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || "Failed to parse document");
+          }
+          
+          const data = await res.json();
+          setText(data.text.slice(0, MAX_CHARS));
+        }
+        
+        resetAudio();
+        setStatus("idle");
+      } catch (err: any) {
+        setErrorMessage(err.message || "Error reading file");
+        setStatus("error");
+      } finally {
+        setIsParsing(false);
+        if (e.target) e.target.value = "";
+      }
     },
     [resetAudio]
   );
@@ -107,17 +138,26 @@ export default function VoiceDashboard() {
       </header>
 
       <div className="rounded-2xl border border-surface-border bg-surface-raised p-5 shadow-xl shadow-black/20">
-        <textarea
-          value={text}
-          onChange={(e) => {
-            setText(e.target.value);
-            setStatus("idle");
-            resetAudio();
-          }}
-          placeholder="Paste your text here..."
-          rows={12}
-          className="w-full resize-none rounded-xl border border-surface-border bg-surface p-4 text-sm leading-relaxed text-neutral-100 placeholder:text-neutral-600 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
-        />
+        <div className="relative">
+          <textarea
+            value={text}
+            onChange={(e) => {
+              setText(e.target.value);
+              setStatus("idle");
+              resetAudio();
+            }}
+            placeholder="Paste your text here or upload a PDF/DOCX..."
+            rows={12}
+            disabled={isParsing}
+            className={`w-full resize-none rounded-xl border border-surface-border bg-surface p-4 text-sm leading-relaxed text-neutral-100 placeholder:text-neutral-600 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand ${isParsing ? "opacity-50" : ""}`}
+          />
+          {isParsing && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-surface/50 backdrop-blur-sm rounded-xl">
+              <Loader2 className="h-8 w-8 animate-spin text-brand mb-2" />
+              <p className="text-sm font-medium text-brand animate-pulse">Extracting text from document...</p>
+            </div>
+          )}
+        </div>
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-500">
           <div className="flex items-center gap-3">
@@ -137,9 +177,10 @@ export default function VoiceDashboard() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".txt,.md"
+              accept=".txt,.md,.pdf,.docx"
               className="hidden"
               onChange={handleFileUpload}
+              disabled={isParsing}
             />
           </label>
         </div>

@@ -9,6 +9,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Play, Pause, Sparkles, Zap, Brain,
   Loader2, Star, ChevronLeft, ChevronRight, LogIn,
+  ArrowRight, Activity, Clock, Frown, ShieldCheck,
+  CheckCircle2, XCircle
 } from "lucide-react";
 import { useFormStatus } from "react-dom";
 import { createCheckoutAction } from "@/app/actions/stripe";
@@ -31,17 +33,19 @@ const SMOKE_CLOUDS = [
 const TESTIMONIALS = [
   {
     name: "Maya R.",
-    role: "Biology undergrad, diagnosed ADHD",
+    role: "Biology undergrad, ADHD",
     quote:
       "I re-read the same paragraph 6 times in silence. With FocusReader I got through 40 pages in one sitting. First time that's ever happened.",
     stars: 5,
+    avatar: "https://i.pravatar.cc/150?u=maya"
   },
   {
     name: "Jordan T.",
-    role: "Product manager, ADHD + anxiety",
+    role: "Product manager, anxiety",
     quote:
       "I've tried every focus app. This one actually works because it removes the hardest part — starting. I just paste, press play, done.",
     stars: 5,
+    avatar: "https://i.pravatar.cc/150?u=jordan"
   },
   {
     name: "Sam K.",
@@ -49,6 +53,7 @@ const TESTIMONIALS = [
     quote:
       "The brown noise layer is everything. My brain stops hunting for distractions when there's a sound floor underneath the voice.",
     stars: 5,
+    avatar: "https://i.pravatar.cc/150?u=sam"
   },
 ];
 
@@ -91,7 +96,7 @@ export default function LandingPage() {
       <nav className="fixed top-0 inset-x-0 z-50 flex items-center justify-between px-6 py-4 border-b border-white/5 bg-[#080a0c]/80 backdrop-blur-md">
         <div className="flex items-center gap-6">
           <div className="flex items-center space-x-2">
-            <div className="h-7 w-7 rounded-full bg-indigo-600 flex items-center justify-center shadow-[0_0_14px_rgba(99,102,241,0.6)]">
+            <div className="h-7 w-7 rounded-full bg-[linear-gradient(45deg,theme(colors.indigo.500),theme(colors.violet.500),theme(colors.indigo.500))] bg-[length:200%_auto] animate-[rainbow_4s_linear_infinite] flex items-center justify-center shadow-[0_0_12px_rgba(99,102,241,0.5)]">
               <Brain className="h-4 w-4 text-white" />
             </div>
             <span className="text-sm font-bold text-white tracking-tight hidden sm:inline">FocusReader</span>
@@ -183,7 +188,7 @@ export default function LandingPage() {
             )}
 
             <motion.h1
-              className="relative text-5xl font-extrabold tracking-tight sm:text-6xl md:text-7xl lg:text-8xl text-transparent bg-clip-text bg-gradient-to-b from-neutral-50 to-neutral-400"
+              className="relative text-5xl font-extrabold tracking-tight sm:text-6xl md:text-7xl lg:text-8xl text-transparent bg-clip-text bg-[linear-gradient(to_right,theme(colors.neutral.100),theme(colors.indigo.200),theme(colors.neutral.400),theme(colors.neutral.100))] bg-[length:200%_auto] animate-[rainbow_5s_linear_infinite]"
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, ease: "easeOut", delay: 0.15 }}
@@ -204,43 +209,51 @@ export default function LandingPage() {
           </motion.p>
 
           <motion.div
-            className="flex gap-4 pt-4"
+            className="w-full pt-4 px-4"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: "easeOut", delay: 0.5 }}
           >
-            <SignUpButton mode="modal" fallbackRedirectUrl="/onboarding">
-              <Button size="lg" className="h-14 px-8 text-lg font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-full transition-all duration-300 shadow-[0_0_40px_-10px_rgba(99,102,241,0.5)] hover:shadow-[0_0_60px_-15px_rgba(99,102,241,0.7)]">
-                Start Focusing
-              </Button>
-            </SignUpButton>
+            <HeroInteractiveHook />
           </motion.div>
         </section>
 
-        {/* ── Testimonials ──────────────────────────────────────────────────── */}
+        {/* ── The Pain (Amygdala Activation) ─────────────────────────────────── */}
+        <PainSection />
+
+        {/* ── Social Proof & Authority ───────────────────────────────────────── */}
         <motion.section
-          className="mt-28 w-full max-w-5xl"
+          className="mt-20 w-full"
           initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut", delay: 0.6 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.8, delay: 0.2 }}
         >
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <AuthorityBanner />
+          
+          <div className="w-full max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 px-4">
             {TESTIMONIALS.map((t, i) => (
-              <div key={i} className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-white/[0.03] p-6">
+              <div key={i} className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#0b0d10]/50 backdrop-blur-sm p-6 shadow-xl relative overflow-hidden group hover:border-indigo-500/30 transition-colors">
                 <div className="flex gap-0.5">
                   {Array.from({ length: t.stars }).map((_, s) => (
                     <Star key={s} className="h-4 w-4 fill-amber-400 text-amber-400" />
                   ))}
                 </div>
-                <p className="text-sm text-neutral-300 leading-relaxed">"{t.quote}"</p>
-                <div className="mt-auto pt-2 border-t border-white/5">
-                  <p className="text-sm font-semibold text-neutral-200">{t.name}</p>
-                  <p className="text-xs text-neutral-500">{t.role}</p>
+                <p className="text-[15px] text-neutral-300 leading-relaxed flex-1">"{t.quote}"</p>
+                <div className="mt-auto pt-4 flex items-center gap-3">
+                  <img src={t.avatar} alt={t.name} className="h-10 w-10 rounded-full border border-white/10 grayscale group-hover:grayscale-0 transition-all" />
+                  <div>
+                    <p className="text-sm font-bold text-white">{t.name}</p>
+                    <p className="text-xs text-neutral-500">{t.role}</p>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         </motion.section>
+
+        {/* ── Us vs Them Matrix ──────────────────────────────────────────────── */}
+        <ComparisonMatrix />
 
         {/* ── Focus Demo ────────────────────────────────────────────────────── */}
         <DemoPlayer />
@@ -249,14 +262,15 @@ export default function LandingPage() {
         <motion.section
           className="mt-32 mb-4 w-full flex flex-col items-center"
           initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut", delay: 0.9 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.8 }}
         >
-          <div className="text-center mb-8 space-y-2">
-            <h2 className="text-2xl font-semibold text-neutral-200 tracking-tight">Simple Pricing</h2>
-            <p className="text-neutral-500 text-sm">Slide left for the best deal 👈</p>
+          <div className="text-center mb-12 space-y-2">
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">Simple, transparent pricing</h2>
+            <p className="text-neutral-400 text-sm sm:text-base">Invest in your focus. It pays dividends.</p>
           </div>
-          <PricingSlider />
+          <DecoyPricing />
         </motion.section>
 
       </main>
@@ -508,3 +522,285 @@ function PricingSlider() {
     </div>
   );
 }
+
+// ─── Psychological Redesign Components ────────────────────────────────────────
+
+function HeroInteractiveHook() {
+  const [text, setText] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleHook = () => {
+    if (!text) return;
+    setIsProcessing(true);
+    setTimeout(() => {
+      // Simulate quick processing then force signup modal open
+      const btn = document.getElementById("hidden-signup-btn");
+      if (btn) btn.click();
+      setIsProcessing(false);
+    }, 1200);
+  };
+
+  return (
+    <div className="w-full max-w-lg mx-auto mt-6">
+      <div className="relative group">
+        <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+        <div className="relative flex flex-col sm:flex-row items-center gap-2 p-2 bg-[#0b0d10]/80 border border-white/10 rounded-2xl backdrop-blur-xl shadow-2xl">
+          <input
+            type="text"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Paste a boring paragraph here..."
+            className="flex-1 bg-transparent border-none text-white placeholder-neutral-500 focus:ring-0 px-4 py-3 sm:py-2 outline-none text-sm w-full"
+            onKeyDown={(e) => e.key === "Enter" && handleHook()}
+          />
+          <Button
+            onClick={handleHook}
+            disabled={isProcessing || !text}
+            className="w-full sm:w-auto rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold h-12 sm:h-10 px-6 whitespace-nowrap transition-all shadow-[0_0_20px_rgba(99,102,241,0.4)] hover:shadow-[0_0_30px_rgba(99,102,241,0.6)]"
+          >
+            {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : (
+              <span className="flex items-center gap-2">
+                Make it Dopamine <ArrowRight className="h-4 w-4" />
+              </span>
+            )}
+          </Button>
+          <div className="hidden">
+            <SignUpButton mode="modal" fallbackRedirectUrl="/onboarding">
+              <button id="hidden-signup-btn">hidden</button>
+            </SignUpButton>
+          </div>
+        </div>
+      </div>
+      <p className="text-xs text-neutral-500 mt-3 text-center">
+        Try it free. No credit card required.
+      </p>
+    </div>
+  );
+}
+
+function PainSection() {
+  return (
+    <motion.section 
+      className="mt-32 w-full max-w-4xl px-4 flex flex-col items-center"
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-100px" }}
+      transition={{ duration: 0.8 }}
+    >
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center bg-white/[0.02] border border-red-500/10 rounded-3xl p-8 md:p-12 shadow-2xl">
+        <div className="space-y-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold uppercase tracking-wider">
+            <Clock className="h-3 w-3" /> The Cost of Drifting
+          </div>
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
+            You are wasting <span className="text-red-400">14 hours a week</span> re-reading things your brain refuses to absorb.
+          </h2>
+          <p className="text-neutral-400 text-lg leading-relaxed">
+            That is a part-time job you aren't getting paid for. Every time your eyes scan a page but your mind is somewhere else, you lose momentum, energy, and time you can never get back.
+          </p>
+        </div>
+        <div className="flex flex-col gap-4">
+          <Card className="bg-[#080a0c] border-white/5 shadow-inner">
+            <CardContent className="p-5 flex items-center gap-4">
+              <div className="h-10 w-10 rounded-full bg-red-500/10 flex items-center justify-center shrink-0">
+                <XCircle className="h-5 w-5 text-red-400" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-white">Traditional Reading</p>
+                <p className="text-xs text-neutral-500 mt-1">High friction, low retention, easy to abandon.</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-[#080a0c] border-indigo-500/20 shadow-[0_0_20px_rgba(99,102,241,0.1)]">
+            <CardContent className="p-5 flex items-center gap-4">
+              <div className="h-10 w-10 rounded-full bg-indigo-500/20 flex items-center justify-center shrink-0">
+                <Brain className="h-5 w-5 text-indigo-400" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-white">FocusReader</p>
+                <p className="text-xs text-neutral-500 mt-1">Optimized audio delivery for immediate flow state.</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </motion.section>
+  );
+}
+
+function AuthorityBanner() {
+  return (
+    <div className="w-full border-y border-white/5 bg-white/[0.01] py-8 my-20 flex flex-col items-center justify-center">
+      <p className="text-xs font-bold uppercase tracking-widest text-neutral-500 mb-6 flex items-center gap-2">
+        <ShieldCheck className="h-4 w-4" /> Trusted by 10,000+ students and professionals at
+      </p>
+      <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-40 grayscale select-none">
+        {/* Mocked logos using text for now to simulate the aesthetic */}
+        <span className="text-xl font-black font-serif">HARVARD</span>
+        <span className="text-xl font-bold font-sans">STANFORD</span>
+        <span className="text-xl font-black italic tracking-tighter">MIT</span>
+        <span className="text-xl font-black font-serif">Yale</span>
+        <span className="text-xl font-bold tracking-widest">NYU</span>
+      </div>
+    </div>
+  );
+}
+
+function DecoyPricing() {
+  return (
+    <div className="w-full max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch px-4">
+      {/* ── Tier 1: Monthly ── */}
+      <Card className="bg-[#0b0d10] border-white/10 flex flex-col transition-all duration-300 hover:border-white/20">
+        <CardContent className="p-8 flex flex-col h-full space-y-6">
+          <div className="space-y-2">
+            <h3 className="text-xl font-bold text-white">Monthly</h3>
+            <p className="text-neutral-500 text-sm">For short-term projects.</p>
+          </div>
+          <div className="text-4xl font-black text-white">
+            $29<span className="text-xl text-neutral-500 font-normal">/mo</span>
+          </div>
+          <ul className="space-y-3 text-sm text-neutral-300 flex-1 mt-4">
+            <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-indigo-400" /> 100,000 chars/month</li>
+            <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-indigo-400" /> All premium voices</li>
+            <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-indigo-400" /> Cancel anytime</li>
+          </ul>
+          <form action={createCheckoutAction} className="w-full pt-4 mt-auto">
+            <Button type="submit" className="w-full bg-white/10 hover:bg-white/20 text-white font-semibold h-11">
+              Start Monthly
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* ── Tier 2: 6 Months (The Irrational Steal) ── */}
+      <div className="relative md:-translate-y-8 md:scale-105 z-10 mt-6 md:mt-0">
+        <div className="absolute -inset-1 rounded-2xl bg-[linear-gradient(45deg,theme(colors.indigo.500),theme(colors.violet.500),theme(colors.cyan.400),theme(colors.indigo.500))] bg-[length:200%_auto] animate-[rainbow_4s_linear_infinite] opacity-60 blur-lg"></div>
+        
+        {/* Badge moved outside the Card so overflow-hidden doesn't clip it */}
+        <div className="absolute top-0 inset-x-0 flex justify-center -translate-y-1/2 z-50">
+          <span className="bg-[#111] border border-indigo-500/50 text-indigo-300 text-[10px] sm:text-xs font-black px-6 py-2 rounded-full tracking-[0.15em] shadow-[0_0_20px_rgba(99,102,241,0.4)] flex items-center gap-2">
+            <Zap className="h-4 w-4 fill-indigo-400 text-indigo-400" /> BEST VALUE — SAVE 40% <Zap className="h-4 w-4 fill-indigo-400 text-indigo-400" />
+          </span>
+        </div>
+
+        <Card className="relative bg-[#0b0d10] border border-indigo-500/30 h-full flex flex-col shadow-[0_0_40px_rgba(99,102,241,0.15)] overflow-hidden">
+          {/* Shine effect overlay */}
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-transparent to-transparent opacity-50 pointer-events-none"></div>
+          
+          <CardContent className="p-8 flex flex-col h-full space-y-6 pt-12">
+            <div className="space-y-2 text-center">
+              <h3 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-200 to-violet-300 drop-shadow-sm">6 Months</h3>
+              <p className="text-neutral-400 text-sm font-bold">Unlimited focus. Zero regrets.</p>
+            </div>
+            <div className="text-center relative">
+              <div className="text-6xl font-black text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">$69<span className="text-3xl text-neutral-400">.99</span></div>
+              <div className="absolute -right-2 top-0 rotate-6 border border-indigo-500/50 bg-indigo-500/10 text-indigo-300 text-[10px] font-black px-2 py-1 rounded-md shadow-lg backdrop-blur-md">STEAL</div>
+              <p className="text-indigo-400 text-sm font-bold mt-3 tracking-wide">$11.67/mo — billed once</p>
+              <p className="text-neutral-600 text-xs mt-1 line-through font-medium">$174 if paid monthly</p>
+            </div>
+            <ul className="space-y-4 text-sm text-neutral-200 flex-1 mt-6 bg-[#131619]/50 p-5 rounded-2xl border border-white/5">
+              <li className="flex items-center gap-3"><CheckCircle2 className="h-5 w-5 text-indigo-400" /> <strong>600,000</strong> total chars</li>
+              <li className="flex items-center gap-3"><CheckCircle2 className="h-5 w-5 text-indigo-400" /> Highest priority queue</li>
+              <li className="flex items-center gap-3"><CheckCircle2 className="h-5 w-5 text-indigo-400" /> Hyperfocus Vault included</li>
+            </ul>
+            <form action={createCheckoutAction} className="w-full pt-6 mt-auto">
+              <Button type="submit" className="relative group w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black text-lg h-14 rounded-xl shadow-[0_0_25px_rgba(99,102,241,0.4)] transition-all overflow-hidden border border-indigo-400/20">
+                <span className="relative z-10 flex items-center justify-center gap-2">
+                  UNLOCK HYPERFOCUS <Zap className="h-5 w-5 fill-white/80 text-transparent" />
+                </span>
+                <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Tier 3: The Decoy ── */}
+      <Card className="bg-[#080a0c] border-white/5 flex flex-col opacity-60 hover:opacity-100 transition-opacity duration-300">
+        <CardContent className="p-8 flex flex-col h-full space-y-6">
+          <div className="space-y-2">
+            <h3 className="text-xl font-bold text-neutral-400">Therapy / Tutoring</h3>
+            <p className="text-neutral-600 text-sm">The traditional cost of ADHD.</p>
+          </div>
+          <div className="text-4xl font-black text-neutral-500">
+            $150<span className="text-xl text-neutral-600 font-normal">/hr</span>
+          </div>
+          <ul className="space-y-3 text-sm text-neutral-500 flex-1 mt-4">
+            <li className="flex items-center gap-2"><XCircle className="h-4 w-4 text-red-900/50" /> High friction</li>
+            <li className="flex items-center gap-2"><XCircle className="h-4 w-4 text-red-900/50" /> Expensive over time</li>
+            <li className="flex items-center gap-2"><XCircle className="h-4 w-4 text-red-900/50" /> Not available at 2 AM</li>
+          </ul>
+          <div className="w-full pt-4 mt-auto">
+            <Button disabled className="w-full bg-white/5 text-neutral-600 font-semibold h-11 border border-white/5">
+              Not Recommended
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function ComparisonMatrix() {
+  return (
+    <motion.section
+      className="mt-32 w-full max-w-5xl px-4 flex flex-col items-center"
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.8 }}
+    >
+      <div className="text-center mb-12 space-y-2">
+        <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">The ADHD Tool Landscape</h2>
+        <p className="text-neutral-400 text-sm sm:text-base">Why cobble together 3 apps when you can use 1?</p>
+      </div>
+
+      <div className="w-full overflow-x-auto rounded-2xl border border-white/10 bg-[#0b0d10] shadow-2xl">
+        <table className="w-full text-left border-collapse min-w-[600px]">
+          <thead>
+            <tr>
+              <th className="p-6 border-b border-white/10 text-neutral-400 font-medium">Feature</th>
+              <th className="p-6 border-b border-white/10 bg-indigo-500/10 text-indigo-300 font-bold border-x border-x-indigo-500/20 text-center w-1/4">FocusReader</th>
+              <th className="p-6 border-b border-white/10 text-neutral-500 font-medium text-center w-1/4">Generic TTS Apps<br/><span className="text-xs text-neutral-600 font-normal">(e.g. Speechify)</span></th>
+              <th className="p-6 border-b border-white/10 text-neutral-500 font-medium text-center w-1/4">Focus Music Apps<br/><span className="text-xs text-neutral-600 font-normal">(e.g. Brain.fm)</span></th>
+            </tr>
+          </thead>
+          <tbody className="text-sm">
+            <tr className="border-b border-white/5">
+              <td className="p-6 text-white font-medium">Reads your documents</td>
+              <td className="p-6 bg-indigo-500/5 border-x border-x-indigo-500/10 text-center"><CheckCircle2 className="h-5 w-5 mx-auto text-indigo-400" /></td>
+              <td className="p-6 text-center"><CheckCircle2 className="h-5 w-5 mx-auto text-neutral-500" /></td>
+              <td className="p-6 text-center"><XCircle className="h-5 w-5 mx-auto text-neutral-700" /></td>
+            </tr>
+            <tr className="border-b border-white/5">
+              <td className="p-6 text-white font-medium">Built-in Brown Noise Floor</td>
+              <td className="p-6 bg-indigo-500/5 border-x border-x-indigo-500/10 text-center"><CheckCircle2 className="h-5 w-5 mx-auto text-indigo-400" /></td>
+              <td className="p-6 text-center"><XCircle className="h-5 w-5 mx-auto text-neutral-700" /></td>
+              <td className="p-6 text-center"><CheckCircle2 className="h-5 w-5 mx-auto text-neutral-500" /></td>
+            </tr>
+            <tr className="border-b border-white/5">
+              <td className="p-6 text-white font-medium">Zero-Friction Interface</td>
+              <td className="p-6 bg-indigo-500/5 border-x border-x-indigo-500/10 text-center"><CheckCircle2 className="h-5 w-5 mx-auto text-indigo-400" /></td>
+              <td className="p-6 text-center"><XCircle className="h-5 w-5 mx-auto text-neutral-700" /></td>
+              <td className="p-6 text-center"><CheckCircle2 className="h-5 w-5 mx-auto text-neutral-500" /></td>
+            </tr>
+            <tr className="border-b border-white/5">
+              <td className="p-6 text-white font-medium">Price</td>
+              <td className="p-6 bg-indigo-500/10 border-x border-x-indigo-500/20 text-center text-white font-bold">$11.67 / mo</td>
+              <td className="p-6 text-center text-neutral-500">~$11.58 / mo</td>
+              <td className="p-6 text-center text-neutral-500">~$6.99 / mo</td>
+            </tr>
+            <tr>
+              <td className="p-6 text-white font-medium">Total Cost to Focus</td>
+              <td className="p-6 bg-indigo-500/10 border-x border-x-indigo-500/20 text-center text-indigo-300 font-black text-lg">$11.67</td>
+              <td className="p-6 text-center text-neutral-500" colSpan={2}>
+                $18.57 / mo <br/><span className="text-xs font-normal text-neutral-600">(if you buy both)</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </motion.section>
+  );
+}
+

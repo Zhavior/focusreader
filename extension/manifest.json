@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "FocusReader - ADHD Bionic TTS",
+  "version": "2.0.0",
+  "description": "Instantly convert any webpage into a dark-mode Bionic Reading format and listen with hyper-realistic TTS and Brown Noise.",
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": ["http://localhost:3001/*"],
+  "action": {
+    "default_title": "Activate FocusReader"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}
