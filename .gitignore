@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Next.js
+frontend/.next/
+frontend/out/
+
+# Local data (SQLite DB + generated audio) — never commit user data
+frontend/data/
+
+# Env files — secrets stay local
+.env
+.env.local
+.env*.local
+
+# OS / editor
+.DS_Store
+*.log
