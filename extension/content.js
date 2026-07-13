@@ -121,7 +121,7 @@ if (!window.hasInjectedFocusReader) {
     });
     vault.appendChild(loadingUI);
 
-    fetch('http://localhost:3001/api/generate', {
+    fetch('http://localhost:3001/api/extension-tts', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
