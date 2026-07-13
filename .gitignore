@@ -16,3 +16,4 @@ frontend/data/
 # OS / editor
 .DS_Store
 *.log
+frontend/data-backup-*/

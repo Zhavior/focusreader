@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx --test --test-concurrency=1 tests/*.test.ts"
+    "test": "tsx --test --test-concurrency=1 tests/*.test.ts",
+    "backup": "node -e \"const fs=require('fs'),path=require('path');const src=process.env.DATA_DIR||path.join(process.cwd(),'data');const dest=src+'-backup-'+new Date().toISOString().slice(0,10);fs.cpSync(src,dest,{recursive:true});console.log('Backed up',src,'->',dest)\""
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
