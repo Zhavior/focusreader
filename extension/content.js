@@ -1023,34 +1023,42 @@
       const shadow = this.host.attachShadow({ mode: 'open' });
       const style = document.createElement('style');
       style.textContent = `
+        @keyframes fr-enter {
+          from { transform: translateY(80px) scale(0.8); opacity: 0; }
+          to { transform: translateY(0) scale(1); opacity: 1; }
+        }
+        @keyframes fr-glow {
+          0%, 100% { box-shadow: 0 8px 30px rgba(0,0,0,0.45), 0 0 18px rgba(124, 92, 255, 0.55); }
+          50% { box-shadow: 0 8px 30px rgba(0,0,0,0.45), 0 0 34px rgba(168, 85, 247, 0.85); }
+        }
         button {
           display: flex;
           align-items: center;
-          gap: 8px;
-          padding: 10px 16px;
-          border: 1px solid rgba(255,255,255,0.15);
-          border-radius: 30px;
-          background: rgba(15, 15, 20, 0.85);
-          backdrop-filter: blur(12px);
-          color: #d8b4fe;
-          font: 600 13px system-ui, -apple-system, sans-serif;
+          gap: 10px;
+          padding: 14px 22px;
+          border: 1px solid rgba(216, 180, 254, 0.35);
+          border-radius: 36px;
+          background: linear-gradient(135deg, #6366f1, #a855f7);
+          color: #ffffff;
+          font: 700 15px system-ui, -apple-system, sans-serif;
+          letter-spacing: 0.01em;
           cursor: pointer;
-          box-shadow: 0 6px 24px rgba(0,0,0,0.35);
-          opacity: 0.75;
-          transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+          animation: fr-enter 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both,
+                     fr-glow 2.4s ease-in-out 0.5s infinite;
+          transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
         button:hover {
-          opacity: 1;
-          transform: translateY(-2px) scale(1.03);
-          border-color: rgba(168, 85, 247, 0.5);
-          box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 20px rgba(168, 85, 247, 0.25);
+          transform: translateY(-3px) scale(1.06);
+          animation-play-state: paused, running;
         }
-        button:active { transform: scale(0.97); }
+        button:active { transform: scale(0.96); }
+        button svg { width: 20px; height: 20px; }
       `;
       shadow.appendChild(style);
 
       this.btn = document.createElement('button');
-      this.btn.innerHTML = `${ICONS.headphones} Focus (${Math.max(1, Math.round(this.chunks.join(' ').length / 950))} min)`;
+      const mins = Math.max(1, Math.round(this.chunks.join(' ').length / 950));
+      this.btn.innerHTML = `${ICONS.headphones} <span>Listen &middot; ${mins} min</span>`;
       this.btn.title = "Read this page aloud with FocusReader";
       this.btn.onclick = () => this.start();
       shadow.appendChild(this.btn);
