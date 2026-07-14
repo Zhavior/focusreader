@@ -1,6 +1,9 @@
 (function () {
-  if (window.hasInjectedFocusReader) return;
-  window.hasInjectedFocusReader = true;
+  // Script-load guard (prevents double *injection*). Deliberately distinct
+  // from window.hasInjectedFocusReader, which tracks whether the controller
+  // has *booted* — conflating the two made attemptInit() a permanent no-op.
+  if (window.__frScriptLoaded) return;
+  window.__frScriptLoaded = true;
 
   // ==========================================
   // CONFIGURATION & THEME
@@ -38,7 +41,7 @@
       return `<b>${word.slice(0, mid)}</b>${word.slice(mid)}`;
     },
     buildWordTimings(text) {
-      const words = text.split(/\\s+/).filter(Boolean);
+      const words = text.split(/\s+/).filter(Boolean);
       const raw = words.map(word => {
         let weight = word.length + 1;
         if (/[.,!?:;]["']?$/.test(word)) weight += 8;
@@ -119,7 +122,7 @@
       let currentLength = 0;
       
       validParagraphs.forEach(p => {
-        const sentences = p.split(/(?<=[.?!])\\s+/);
+        const sentences = p.split(/(?<=[.?!])\s+/);
         sentences.forEach(s => {
           const trimmed = s.trim();
           if (trimmed.length > 10) {
@@ -230,7 +233,7 @@
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
-            'Authorization': \`Bearer \${token}\`
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({ text, voice: 'premium' })
         });
@@ -241,7 +244,7 @@
         }
         
         if (!res.ok) {
-          let errMsg = \`API Error \${res.status}\`;
+          let errMsg = `API Error ${res.status}`;
           try { const data = await res.json(); if (data.message) errMsg = data.message; } catch(e){}
           throw new Error(errMsg);
         }
@@ -321,7 +324,7 @@
 
     buildStyles() {
       const style = document.createElement('style');
-      style.textContent = \`
+      style.textContent = `
         :host {
           --bg-color: #050505;
           --text-color: #ffffff;
@@ -441,7 +444,7 @@
           from { transform: translateX(100%); opacity: 0; }
           to { transform: translateX(0); opacity: 1; }
         }
-      \`;
+      `;
       this.shadow.appendChild(style);
     }
 
@@ -484,7 +487,7 @@
     addControlButton(iconHtml, text, isPrimary = false) {
       const btn = document.createElement('button');
       if (isPrimary) btn.className = 'primary';
-      btn.innerHTML = \`\${iconHtml} \${text}\`;
+      btn.innerHTML = `${iconHtml} ${text}`;
       this.controls.appendChild(btn);
       return btn;
     }
@@ -526,7 +529,7 @@
         
         this.recognition.onstart = () => {
           this.isListening = true;
-          this.btn.innerHTML = \`\${ICONS.sparkles} Brain (Listening...)\`;
+          this.btn.innerHTML = `${ICONS.sparkles} Brain (Listening...)`;
           this.btn.style.color = '#4ade80';
           this.scrollLoop();
         };
@@ -534,7 +537,7 @@
         this.recognition.onend = () => {
           this.isListening = false;
           this.currentScrollDir = 0;
-          this.btn.innerHTML = \`\${ICONS.sparkles} Brain (Mic Off)\`;
+          this.btn.innerHTML = `${ICONS.sparkles} Brain (Mic Off)`;
           this.btn.style.color = '#fff';
         };
         
@@ -570,8 +573,8 @@
       if (cmd.includes('refresh')) window.location.reload();
       else if (cmd.includes('back')) window.history.back();
       else if (cmd.startsWith('go to ')) {
-        const target = cmd.replace('go to ', '').trim().replace(/\\s+/g, '');
-        if (target) window.location.href = \`https://\${target}.com\`;
+        const target = cmd.replace('go to ', '').trim().replace(/\s+/g, '');
+        if (target) window.location.href = `https://${target}.com`;
       }
       else if (cmd.includes('pause') || cmd.includes('stop')) {
         this.controller.pauseSystem();
@@ -580,7 +583,7 @@
         this.controller.resumeSystem();
       }
       
-      const noteMatch = cmd.match(/^(?:create|take|save|write|send)\\s+(?:a\\s+)?(?:note|thought|memo)\\s*(?:about|that)?\\s*(.*)$/i);
+      const noteMatch = cmd.match(/^(?:create|take|save|write|send)\s+(?:a\s+)?(?:note|thought|memo)\s*(?:about|that)?\s*(.*)$/i);
       if (noteMatch) {
         const noteContent = noteMatch[1].trim() || "Empty note";
         this.ui.showToast("Sending note to dashboard...");
@@ -588,7 +591,7 @@
           const token = await Utils.getToken();
           const res = await fetch('http://localhost:3001/api/extension-notes', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': \`Bearer \${token}\` },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
             body: JSON.stringify({ note: noteContent, source: window.location.href })
           });
           if (res.ok) this.ui.showToast("Note successfully saved! 📝");
@@ -653,11 +656,11 @@
       this.renderCurrentChunk();
 
       // Controls
-      const btnSpeed = this.ui.addControlButton(ICONS.lightning, \`\${THEME.speeds[0].toFixed(1)}x\`);
+      const btnSpeed = this.ui.addControlButton(ICONS.lightning, `${THEME.speeds[0].toFixed(1)}x`);
       btnSpeed.onclick = () => {
         this.config.speedIdx = (this.config.speedIdx + 1) % THEME.speeds.length;
         const spd = THEME.speeds[this.config.speedIdx];
-        btnSpeed.innerHTML = \`\${ICONS.lightning} \${spd.toFixed(1)}x\`;
+        btnSpeed.innerHTML = `${ICONS.lightning} ${spd.toFixed(1)}x`;
         this.audio.setSpeed(spd);
       };
 
@@ -667,7 +670,7 @@
         btnColor.style.color = THEME.colors[this.config.colorIdx].solid;
         if (this.activeWordSpan) {
            this.activeWordSpan.style.color = THEME.colors[this.config.colorIdx].solid;
-           this.activeWordSpan.style.textShadow = \`0 0 15px \${THEME.colors[this.config.colorIdx].val}\`;
+           this.activeWordSpan.style.textShadow = `0 0 15px ${THEME.colors[this.config.colorIdx].val}`;
         }
       };
 
@@ -682,7 +685,7 @@
       const btnNoise = this.ui.addControlButton(ICONS.waves, THEME.soundscapes[0]);
       btnNoise.onclick = () => {
         this.config.noiseIdx = (this.config.noiseIdx + 1) % THEME.soundscapes.length;
-        btnNoise.innerHTML = \`\${ICONS.waves} \${THEME.soundscapes[this.config.noiseIdx]}\`;
+        btnNoise.innerHTML = `${ICONS.waves} ${THEME.soundscapes[this.config.noiseIdx]}`;
         this.audio.setNoiseMode(this.config.noiseIdx);
       };
 
@@ -750,7 +753,7 @@
         }
       } catch (err) {
         console.error("Fetch failed", err);
-        this.ui.showToast(\`TTS Error: \${err.message}\`, true);
+        this.ui.showToast(`TTS Error: ${err.message}`, true);
       } finally {
         if (this.audioQueue.length < 2) {
           this.fetchNextChunk(); // Buffer ahead
@@ -814,7 +817,7 @@
          }
          const color = THEME.colors[this.config.colorIdx];
          nextSpan.style.color = color.solid;
-         nextSpan.style.textShadow = \`0 0 15px \${color.val}\`;
+         nextSpan.style.textShadow = `0 0 15px ${color.val}`;
          
          const rect = nextSpan.getBoundingClientRect();
          const vh = window.innerHeight;
@@ -832,13 +835,13 @@
     pauseSystem() {
       this.isPaused = true;
       this.audio.pause();
-      this.btnPause.innerHTML = \`\${ICONS.play} Play\`;
+      this.btnPause.innerHTML = `${ICONS.play} Play`;
     }
 
     resumeSystem() {
       this.isPaused = false;
       this.audio.resume();
-      this.btnPause.innerHTML = \`\${ICONS.pause} Pause\`;
+      this.btnPause.innerHTML = `${ICONS.pause} Pause`;
       if (!this.isPlaying && this.audioQueue.length > 0) {
         this.playNextInQueue();
       }
@@ -871,10 +874,25 @@
 
   // Check immediately
   attemptInit();
-  
+
   // Check again for Single Page Apps (React/Next) that load DOM late
   setTimeout(attemptInit, 1000);
   setTimeout(attemptInit, 2500);
   setTimeout(attemptInit, 4000);
+
+  // Stay alive for SPA navigations: when the URL changes without a page
+  // load, give the new view a chance to boot the reader too.
+  let lastHref = location.href;
+  setInterval(() => {
+    if (location.href !== lastHref) {
+      lastHref = location.href;
+      // Only boot if no controller is active — never stack a second widget
+      // over a running session (destroy() clears the flag).
+      if (!window.hasInjectedFocusReader) {
+        setTimeout(attemptInit, 800);
+        setTimeout(attemptInit, 2500);
+      }
+    }
+  }, 1500);
 
 })();
