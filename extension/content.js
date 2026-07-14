@@ -1,12 +1,31 @@
+/**
+ * Zhavior FocusReader — content script (v3)
+ *
+ * Turns any article into a dopamine-optimized read-along session:
+ * hyperfocus vault, karaoke word highlighting, Bionic reading, procedural
+ * soundscapes, voice commands, and premium TTS streamed from the FocusReader
+ * backend.
+ *
+ * Performance principles ("easy on the Chrome"):
+ *  - Nothing heavy runs until the user clicks the launcher. No AudioContext,
+ *    no TTS fetches (credits are only spent on demand), no rAF loops.
+ *  - Soundscapes are precomputed 8s looped AudioBuffers — zero per-sample
+ *    JS during playback (the old ScriptProcessorNode burned main-thread CPU
+ *    on every page, even with sound off).
+ *  - DOM virtualization: only the current chunk's words exist in the DOM.
+ *  - The karaoke loop runs only while audio is actually playing.
+ */
 (function () {
-  // Script-load guard (prevents double *injection*). Deliberately distinct
-  // from window.hasInjectedFocusReader, which tracks whether the controller
-  // has *booted* — conflating the two made attemptInit() a permanent no-op.
+  // Script-load guard (prevents double injection); distinct from the
+  // per-page launcher flag below.
   if (window.__frScriptLoaded) return;
   window.__frScriptLoaded = true;
 
+  const API_BASE = "http://localhost:3001";
+  const DASHBOARD_URL = `${API_BASE}/dashboard`;
+
   // ==========================================
-  // CONFIGURATION & THEME
+  // THEME (visual truth preserved from v2)
   // ==========================================
   const THEME = {
     colors: [
@@ -28,7 +47,8 @@
     play: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
     home: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
     x: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
-    waves: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4l2-9 5 18 5-18 2 9h2"/></svg>`
+    waves: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4l2-9 5 18 5-18 2 9h2"/></svg>`,
+    headphones: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></svg>`
   };
 
   // ==========================================
@@ -40,29 +60,27 @@
       const mid = Math.ceil(word.length / 2);
       return `<b>${word.slice(0, mid)}</b>${word.slice(mid)}`;
     },
+
     buildWordTimings(text) {
       const words = text.split(/\s+/).filter(Boolean);
       const raw = words.map(word => {
         let weight = word.length + 1;
-        if (/[.,!?:;]["']?$/.test(word)) weight += 8;
+        if (/[.,!?:;]["']?$/.test(word)) weight += 8; // punctuation pause
         return { word, weight };
       });
       const totalWeight = raw.reduce((sum, t) => sum + t.weight, 0);
       if (totalWeight === 0) return { tokens: [], words: [] };
-      
+
       const tokens = [];
       let cumulative = 0;
       for (const t of raw) {
         const startFrac = cumulative / totalWeight;
         cumulative += t.weight;
-        tokens.push({
-          word: t.word,
-          startFrac,
-          endFrac: cumulative / totalWeight
-        });
+        tokens.push({ word: t.word, startFrac, endFrac: cumulative / totalWeight });
       }
       return { tokens, words };
     },
+
     wordIndexAt(tokens, frac) {
       if (tokens.length === 0) return -1;
       if (frac <= 0) return 0;
@@ -75,55 +93,63 @@
       }
       return lo;
     },
+
     getToken() {
-      return new Promise((resolve, reject) => {
-        if (!chrome || !chrome.storage || !chrome.storage.sync) {
-          alert("Zhavior FocusReader was updated. Please refresh the page to continue using it!");
-          reject(new Error("Extension context invalidated"));
-          return;
-        }
+      return new Promise((resolve) => {
+        if (!chrome?.storage?.sync) return resolve('');
         chrome.storage.sync.get(['zhaviorToken'], res => resolve(res.zhaviorToken || ''));
       });
+    },
+
+    /** Persisted user preferences (speed/color/bionic/noise survive sessions). */
+    loadPrefs() {
+      return new Promise((resolve) => {
+        const defaults = { speedIdx: 0, colorIdx: 0, noiseIdx: 0, isBionic: true };
+        if (!chrome?.storage?.sync) return resolve(defaults);
+        chrome.storage.sync.get(['zhaviorPrefs'], res =>
+          resolve({ ...defaults, ...(res.zhaviorPrefs || {}) })
+        );
+      });
+    },
+
+    savePrefs(prefs) {
+      try { chrome?.storage?.sync?.set({ zhaviorPrefs: prefs }); } catch { /* best-effort */ }
     }
   };
 
   // ==========================================
-  // MODULES
+  // ARTICLE EXTRACTION
   // ==========================================
-
   class ArticleExtractor {
     static extract() {
       const articleNode = document.querySelector('article, [role="main"], main') || document.body;
       const rawParagraphs = articleNode.querySelectorAll('p, h2, h3, li');
       const validParagraphs = [];
-      
+
       const badSelector = 'nav, footer, aside, .sidebar, .comments, .ad, .promo, [id*="nav"], [id*="footer"], [class*="ad-"], [class*="sponsored"]';
       const ctaKeywords = ['in your inbox', 'join medium', 'get updates', 'subscribe to', 'sign up', 'read more from', 'written by', 'newsletter'];
-      
+
       rawParagraphs.forEach(p => {
         if (p.closest(badSelector)) return;
-        const text = p.innerText || p.textContent;
-        const links = p.querySelectorAll('a');
+        const text = p.innerText || p.textContent || '';
         let linkTextLen = 0;
-        links.forEach(a => { linkTextLen += (a.innerText || "").length; });
+        p.querySelectorAll('a').forEach(a => { linkTextLen += (a.innerText || "").length; });
         const linkDensity = linkTextLen / Math.max(text.length, 1);
-        
+
         const lowerText = text.toLowerCase();
         if (ctaKeywords.some(keyword => lowerText.includes(keyword))) return;
-        
         if (text.trim().length > 30 && linkDensity < 0.3) {
           validParagraphs.push(text.trim());
         }
       });
 
-      // Chunking algorithm
+      // Sentence-aware chunking to ~400 chars per TTS request.
       const chunks = [];
       let currentChunk = [];
       let currentLength = 0;
-      
+
       validParagraphs.forEach(p => {
-        const sentences = p.split(/(?<=[.?!])\s+/);
-        sentences.forEach(s => {
+        p.split(/(?<=[.?!])\s+/).forEach(s => {
           const trimmed = s.trim();
           if (trimmed.length > 10) {
             if (currentLength + trimmed.length > 400 && currentChunk.length > 0) {
@@ -137,122 +163,159 @@
         });
       });
       if (currentChunk.length > 0) chunks.push(currentChunk.join(' '));
-      
+
       return chunks;
     }
   }
 
+  // ==========================================
+  // SOUNDSCAPES — precomputed looped buffers
+  // ==========================================
+  // Each mode renders 8 seconds of noise ONCE into an AudioBuffer, then loops
+  // it via AudioBufferSourceNode. After generation there is no per-sample JS
+  // at all. Buffers are cached per mode.
+  const Soundscapes = {
+    LOOP_SECONDS: 8,
+    cache: new Map(),
+
+    getBuffer(ctx, mode) {
+      if (this.cache.has(mode)) return this.cache.get(mode);
+      const length = ctx.sampleRate * this.LOOP_SECONDS;
+      const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+
+      // Same DSP math as v2, run once instead of forever.
+      let lastOut = 0;
+      const b = [0, 0, 0, 0, 0, 0, 0];
+      let rainDropTimer = 0;
+
+      for (let i = 0; i < length; i++) {
+        const white = Math.random() * 2 - 1;
+        let sample = 0;
+
+        if (mode === 1) { // Brown
+          sample = (lastOut + (0.02 * white)) / 1.02;
+          lastOut = sample;
+          sample *= 3.5;
+        } else if (mode === 2 || mode === 4 || mode === 5) { // Pink-based
+          b[0] = 0.99886 * b[0] + white * 0.0555179;
+          b[1] = 0.99332 * b[1] + white * 0.0750759;
+          b[2] = 0.96900 * b[2] + white * 0.1538520;
+          b[3] = 0.86650 * b[3] + white * 0.3104856;
+          b[4] = 0.55000 * b[4] + white * 0.5329522;
+          b[5] = -0.7616 * b[5] - white * 0.0168980;
+          sample = b[0] + b[1] + b[2] + b[3] + b[4] + b[5] + b[6] + white * 0.5362;
+          sample *= 0.11;
+          b[6] = white * 0.115926;
+
+          if (mode >= 4) { // Rain
+            let rainSample = sample * 0.4;
+            rainDropTimer--;
+            const dropThreshold = mode === 4 ? 4000 : 1200;
+            if (Math.random() * dropThreshold < 1) {
+              rainDropTimer = mode === 4 ? 100 : 250;
+            }
+            if (rainDropTimer > 0) {
+              rainSample += white * 0.15 * (rainDropTimer / 250);
+            }
+            sample = rainSample * (mode === 5 ? 1.6 : 1.2);
+          }
+        } else if (mode === 3) { // White
+          sample = white * 0.15;
+        }
+        data[i] = sample;
+      }
+
+      // Short crossfade at the loop seam to avoid a click.
+      const fade = Math.floor(ctx.sampleRate * 0.05);
+      for (let i = 0; i < fade; i++) {
+        const k = i / fade;
+        data[i] = data[i] * k + data[length - fade + i] * (1 - k);
+      }
+
+      this.cache.set(mode, buffer);
+      return buffer;
+    }
+  };
+
+  // ==========================================
+  // AUDIO ENGINE — lazy, on-demand
+  // ==========================================
   class AudioEngine {
     constructor() {
-      this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      this.bufferSize = 4096;
-      this.noiseProcessor = null;
+      this.ctx = null;          // created on first use, not at page load
+      this.noiseSource = null;
       this.noiseGain = null;
-      this.noiseState = {
-        mode: 0, // 0: Off, 1: Brown, 2: Pink, 3: White, 4: Light Rain, 5: Heavy Rain
-        lastOut: 0,
-        b: [0,0,0,0,0,0,0],
-        rainDropTimer: 0
-      };
-      
+      this.noiseMode = 0;
       this.voiceAudio = null;
       this.playbackRate = 1.0;
-      
-      this.initSoundscapes();
     }
 
-    initSoundscapes() {
-      this.noiseProcessor = this.audioCtx.createScriptProcessor(this.bufferSize, 1, 1);
-      this.noiseProcessor.onaudioprocess = (e) => {
-        const output = e.outputBuffer.getChannelData(0);
-        const st = this.noiseState;
-        if (st.mode === 0) {
-          for (let i = 0; i < this.bufferSize; i++) output[i] = 0;
-          return;
-        }
-        
-        for (let i = 0; i < this.bufferSize; i++) {
-          const white = Math.random() * 2 - 1;
-          let sample = 0;
-          
-          if (st.mode === 1) { // Brown
-            sample = (st.lastOut + (0.02 * white)) / 1.02;
-            st.lastOut = sample;
-            sample *= 3.5;
-          } 
-          else if (st.mode === 2 || st.mode === 4 || st.mode === 5) { // Pink-based
-            st.b[0] = 0.99886 * st.b[0] + white * 0.0555179;
-            st.b[1] = 0.99332 * st.b[1] + white * 0.0750759;
-            st.b[2] = 0.96900 * st.b[2] + white * 0.1538520;
-            st.b[3] = 0.86650 * st.b[3] + white * 0.3104856;
-            st.b[4] = 0.55000 * st.b[4] + white * 0.5329522;
-            st.b[5] = -0.7616 * st.b[5] - white * 0.0168980;
-            sample = st.b[0] + st.b[1] + st.b[2] + st.b[3] + st.b[4] + st.b[5] + st.b[6] + white * 0.5362;
-            sample *= 0.11;
-            st.b[6] = white * 0.115926;
-            
-            if (st.mode >= 4) { // Rain
-               let rainSample = sample * 0.4; 
-               st.rainDropTimer--;
-               let dropThreshold = st.mode === 4 ? 4000 : 1200; 
-               if (Math.random() * dropThreshold < 1) {
-                  st.rainDropTimer = st.mode === 4 ? 100 : 250;
-               }
-               if (st.rainDropTimer > 0) {
-                  rainSample += white * 0.15 * (st.rainDropTimer / 250);
-               }
-               sample = rainSample * (st.mode === 5 ? 1.6 : 1.2);
-            }
-          }
-          else if (st.mode === 3) { // White
-            sample = white * 0.15;
-          }
-          output[i] = sample;
-        }
-      };
-      
-      this.noiseGain = this.audioCtx.createGain();
-      this.noiseGain.gain.value = 0.3;
-      this.noiseProcessor.connect(this.noiseGain);
-      this.noiseGain.connect(this.audioCtx.destination);
+    ensureCtx() {
+      if (!this.ctx) {
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+      return this.ctx;
     }
 
     setNoiseMode(mode) {
-      this.noiseState.mode = mode;
-      if (mode > 0 && this.audioCtx.state === 'suspended') {
-         this.audioCtx.resume();
+      this.noiseMode = mode;
+      if (this.noiseSource) {
+        this.noiseSource.stop();
+        this.noiseSource.disconnect();
+        this.noiseSource = null;
       }
+      if (mode === 0) return;
+
+      const ctx = this.ensureCtx();
+      if (!this.noiseGain) {
+        this.noiseGain = ctx.createGain();
+        this.noiseGain.gain.value = 0.3;
+        this.noiseGain.connect(ctx.destination);
+      }
+      this.noiseSource = ctx.createBufferSource();
+      this.noiseSource.buffer = Soundscapes.getBuffer(ctx, mode);
+      this.noiseSource.loop = true;
+      this.noiseSource.connect(this.noiseGain);
+      this.noiseSource.start();
     }
 
     async fetchTTS(text, retries = 1) {
       try {
         const token = await Utils.getToken();
-        if (!token) throw new Error("Not logged in");
-        
-        const res = await fetch('http://localhost:3001/api/extension-tts', {
+        if (!token) throw new Error("Not logged in — open the extension popup to add your token.");
+
+        const res = await fetch(`${API_BASE}/api/extension-tts`, {
           method: 'POST',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({ text, voice: 'premium' })
+          body: JSON.stringify({ text })
         });
-        
+
         if (res.status === 429 && retries > 0) {
           await new Promise(r => setTimeout(r, 4000));
           return this.fetchTTS(text, retries - 1);
         }
-        
+        if (res.status === 401) {
+          throw new Error("Token invalid or revoked — generate a new one in Dashboard → Tools.");
+        }
+        if (res.status === 402) {
+          throw new Error("Out of credits — upgrade or wait for your renewal.");
+        }
         if (!res.ok) {
           let errMsg = `API Error ${res.status}`;
-          try { const data = await res.json(); if (data.message) errMsg = data.message; } catch(e){}
+          try { const data = await res.json(); if (data.message) errMsg = data.message; } catch { /* not json */ }
           throw new Error(errMsg);
         }
-        
+
         const blob = await res.blob();
         return URL.createObjectURL(blob);
       } catch (err) {
-        if (retries > 0 && err.message !== "Not logged in") {
+        const noRetry = /Not logged in|invalid or revoked|Out of credits/.test(err.message);
+        if (retries > 0 && !noRetry) {
           await new Promise(r => setTimeout(r, 2000));
           return this.fetchTTS(text, retries - 1);
         }
@@ -261,30 +324,33 @@
     }
 
     playVoice(url, onPlay, onEnd) {
-      if (this.voiceAudio) {
-        this.voiceAudio.pause();
-        this.voiceAudio = null;
-      }
+      this.stopVoice();
       this.voiceAudio = new Audio(url);
       this.voiceAudio.playbackRate = this.playbackRate;
-      
       this.voiceAudio.onplay = onPlay;
       this.voiceAudio.onended = () => {
         URL.revokeObjectURL(url);
         if (onEnd) onEnd();
       };
-      
-      this.voiceAudio.play().catch(e => console.error("Playback error:", e));
+      this.voiceAudio.play().catch(e => console.error("[FocusReader] playback error:", e));
     }
-    
+
+    stopVoice() {
+      if (this.voiceAudio) {
+        this.voiceAudio.pause();
+        this.voiceAudio.src = '';
+        this.voiceAudio = null;
+      }
+    }
+
     pause() {
       if (this.voiceAudio) this.voiceAudio.pause();
-      if (this.audioCtx.state === 'running') this.audioCtx.suspend();
+      if (this.ctx?.state === 'running') this.ctx.suspend();
     }
-    
+
     resume() {
       if (this.voiceAudio) this.voiceAudio.play();
-      if (this.audioCtx.state === 'suspended') this.audioCtx.resume();
+      if (this.ctx?.state === 'suspended') this.ctx.resume();
     }
 
     setSpeed(speed) {
@@ -293,29 +359,31 @@
     }
 
     destroy() {
-      this.pause();
-      if (this.noiseProcessor) this.noiseProcessor.disconnect();
+      this.stopVoice();
+      if (this.noiseSource) { this.noiseSource.stop(); this.noiseSource.disconnect(); }
       if (this.noiseGain) this.noiseGain.disconnect();
-      this.audioCtx.close();
+      if (this.ctx) this.ctx.close();
+      this.ctx = null;
     }
   }
 
+  // ==========================================
+  // SHADOW UI — vault, controls, toasts
+  // ==========================================
   class ShadowUI {
     constructor() {
       this.host = document.createElement('div');
       this.host.id = "focusreader-host";
-      
-      // Inline styles for the host to take full screen but allow pointer events through when hidden
       Object.assign(this.host.style, {
         position: 'fixed',
         inset: '0',
         zIndex: '2147483647',
-        pointerEvents: 'none' // Sub-elements will enable pointerEvents
+        pointerEvents: 'none'
       });
 
       this.shadow = this.host.attachShadow({ mode: 'open' });
       document.body.appendChild(this.host);
-      
+
       this.buildStyles();
       this.buildVault();
       this.buildControls();
@@ -331,7 +399,7 @@
           --inactive-text: #525252;
           font-family: system-ui, -apple-system, sans-serif;
         }
-        
+
         .vault {
           position: absolute;
           inset: 0;
@@ -356,12 +424,13 @@
           letter-spacing: -0.02em;
           padding-bottom: 30vh;
         }
-        
+
         .word {
           color: var(--inactive-text);
           transition: color 0.1s ease, text-shadow 0.1s ease;
           padding: 0 2px;
           border-radius: 4px;
+          cursor: pointer;
         }
 
         .controls-wrapper {
@@ -414,7 +483,7 @@
         }
         button:hover { background: rgba(255,255,255,0.1); }
         button:active { transform: scale(0.95); }
-        
+
         button.primary { background: rgba(255,255,255,0.95); color: #000; }
         button.primary:hover { transform: scale(1.05); background: #fff; }
 
@@ -422,10 +491,10 @@
           position: fixed;
           top: 20px;
           right: 20px;
-          z-index: 9999;
           display: flex;
           flex-direction: column;
           gap: 10px;
+          pointer-events: none;
         }
 
         .toast {
@@ -451,10 +520,8 @@
     buildVault() {
       this.vault = document.createElement('div');
       this.vault.className = "vault";
-      
       this.content = document.createElement('div');
       this.content.className = "content-container";
-      
       this.vault.appendChild(this.content);
       this.shadow.appendChild(this.vault);
     }
@@ -462,10 +529,8 @@
     buildControls() {
       this.controlsWrapper = document.createElement('div');
       this.controlsWrapper.className = "controls-wrapper";
-      
       this.controls = document.createElement('div');
       this.controls.className = "controls";
-      
       this.controlsWrapper.appendChild(this.controls);
       this.shadow.appendChild(this.controlsWrapper);
     }
@@ -506,6 +571,9 @@
     }
   }
 
+  // ==========================================
+  // BRAIN COMMANDER — voice control
+  // ==========================================
   class BrainCommander {
     constructor(ui, audioEngine, controller) {
       this.ui = ui;
@@ -515,51 +583,47 @@
       this.isListening = false;
       this.btn = null;
       this.currentScrollDir = 0;
-      
       this.initSpeech();
     }
 
     initSpeech() {
-      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-        this.recognition = new SpeechRec();
-        this.recognition.continuous = true;
-        this.recognition.interimResults = true;
-        this.recognition.lang = 'en-US';
-        
-        this.recognition.onstart = () => {
-          this.isListening = true;
-          this.btn.innerHTML = `${ICONS.sparkles} Brain (Listening...)`;
-          this.btn.style.color = '#4ade80';
-          this.scrollLoop();
-        };
-        
-        this.recognition.onend = () => {
-          this.isListening = false;
-          this.currentScrollDir = 0;
-          this.btn.innerHTML = `${ICONS.sparkles} Brain (Mic Off)`;
-          this.btn.style.color = '#fff';
-        };
-        
-        this.recognition.onresult = async (event) => {
-          let interimTranscript = '';
-          let finalTranscript = '';
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript.toLowerCase().trim();
-            else interimTranscript += event.results[i][0].transcript.toLowerCase().trim();
-          }
-          
-          const activeText = finalTranscript || interimTranscript;
-          
-          if (activeText.includes('down')) this.currentScrollDir = 1;
-          else if (activeText.includes('up')) this.currentScrollDir = -1;
-          else this.currentScrollDir = 0;
-          
-          if (finalTranscript) {
-            this.handleCommand(finalTranscript);
-          }
-        };
-      }
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRec) return;
+
+      this.recognition = new SpeechRec();
+      this.recognition.continuous = true;
+      this.recognition.interimResults = true;
+      this.recognition.lang = 'en-US';
+
+      this.recognition.onstart = () => {
+        this.isListening = true;
+        this.btn.innerHTML = `${ICONS.sparkles} Brain (Listening...)`;
+        this.btn.style.color = '#4ade80';
+        this.scrollLoop();
+      };
+
+      this.recognition.onend = () => {
+        this.isListening = false;
+        this.currentScrollDir = 0;
+        this.btn.innerHTML = `${ICONS.sparkles} Brain (Mic Off)`;
+        this.btn.style.color = '#fff';
+      };
+
+      this.recognition.onresult = (event) => {
+        let interimTranscript = '';
+        let finalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript.toLowerCase().trim();
+          else interimTranscript += event.results[i][0].transcript.toLowerCase().trim();
+        }
+
+        const activeText = finalTranscript || interimTranscript;
+        if (activeText.includes('down')) this.currentScrollDir = 1;
+        else if (activeText.includes('up')) this.currentScrollDir = -1;
+        else this.currentScrollDir = 0;
+
+        if (finalTranscript) this.handleCommand(finalTranscript);
+      };
     }
 
     scrollLoop() {
@@ -576,26 +640,23 @@
         const target = cmd.replace('go to ', '').trim().replace(/\s+/g, '');
         if (target) window.location.href = `https://${target}.com`;
       }
-      else if (cmd.includes('pause') || cmd.includes('stop')) {
-        this.controller.pauseSystem();
-      }
-      else if (cmd.includes('play') || cmd.includes('turn on voice')) {
-        this.controller.resumeSystem();
-      }
-      
+      else if (cmd.includes('pause') || cmd.includes('stop')) this.controller.pauseSystem();
+      else if (cmd.includes('play') || cmd.includes('turn on voice')) this.controller.resumeSystem();
+
       const noteMatch = cmd.match(/^(?:create|take|save|write|send)\s+(?:a\s+)?(?:note|thought|memo)\s*(?:about|that)?\s*(.*)$/i);
       if (noteMatch) {
         const noteContent = noteMatch[1].trim() || "Empty note";
         this.ui.showToast("Sending note to dashboard...");
         try {
           const token = await Utils.getToken();
-          const res = await fetch('http://localhost:3001/api/extension-notes', {
+          const res = await fetch(`${API_BASE}/api/extension-notes`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
             body: JSON.stringify({ note: noteContent, source: window.location.href })
           });
           if (res.ok) this.ui.showToast("Note successfully saved! 📝");
-        } catch (err) {
+          else this.ui.showToast("Could not save the note.", true);
+        } catch {
           this.ui.showToast("Error saving note.", true);
         }
       }
@@ -613,151 +674,190 @@
         else this.recognition.start();
       };
     }
-    
+
     stop() {
       if (this.recognition && this.isListening) this.recognition.stop();
     }
   }
 
+  // ==========================================
+  // CONTROLLER — session orchestration
+  // ==========================================
   class FocusReaderController {
-    constructor(chunks) {
+    constructor(chunks, prefs, onExit) {
       this.chunks = chunks;
       this.chunkTokens = chunks.map(c => Utils.buildWordTimings(c));
-      
+      this.onExit = onExit;
+
       this.ui = new ShadowUI();
       this.audio = new AudioEngine();
       this.brain = new BrainCommander(this.ui, this.audio, this);
-      
-      // State
+
       this.currentChunkIdx = 0;
       this.isPaused = false;
       this.isQueueActive = true;
       this.audioQueue = [];
       this.isPlaying = false;
-      
-      this.config = {
-        speedIdx: 0,
-        colorIdx: 0,
-        noiseIdx: 0,
-        isBionic: true
-      };
-      
+      this.nextFetchIdx = 0;
+      this.inflightFetches = 0;
+
+      this.config = { ...prefs };
+
       this.activeSpans = [];
       this.activeWordSpan = null;
       this.animationFrameId = null;
 
       this.setupUI();
+      this.applyPrefs();
       this.ui.show();
-      this.fetchNextChunk();
+      this.bindKeys();
+      this.fillBuffer();
     }
 
     setupUI() {
-      // Setup the dynamic content container
       this.renderCurrentChunk();
 
-      // Controls
-      const btnSpeed = this.ui.addControlButton(ICONS.lightning, `${THEME.speeds[0].toFixed(1)}x`);
-      btnSpeed.onclick = () => {
+      this.btnSpeed = this.ui.addControlButton(ICONS.lightning, `${THEME.speeds[this.config.speedIdx].toFixed(2)}x`);
+      this.btnSpeed.onclick = () => {
         this.config.speedIdx = (this.config.speedIdx + 1) % THEME.speeds.length;
-        const spd = THEME.speeds[this.config.speedIdx];
-        btnSpeed.innerHTML = `${ICONS.lightning} ${spd.toFixed(1)}x`;
-        this.audio.setSpeed(spd);
+        this.applySpeed();
+        this.persist();
       };
 
-      const btnColor = this.ui.addControlButton(ICONS.palette, "Color");
-      btnColor.onclick = () => {
+      this.btnColor = this.ui.addControlButton(ICONS.palette, "Color");
+      this.btnColor.onclick = () => {
         this.config.colorIdx = (this.config.colorIdx + 1) % THEME.colors.length;
-        btnColor.style.color = THEME.colors[this.config.colorIdx].solid;
-        if (this.activeWordSpan) {
-           this.activeWordSpan.style.color = THEME.colors[this.config.colorIdx].solid;
-           this.activeWordSpan.style.textShadow = `0 0 15px ${THEME.colors[this.config.colorIdx].val}`;
-        }
+        this.applyColor();
+        this.persist();
       };
 
-      const btnBionic = this.ui.addControlButton(ICONS.brain, "ADHD");
-      btnBionic.style.color = '#bae6fd';
-      btnBionic.onclick = () => {
+      this.btnBionic = this.ui.addControlButton(ICONS.brain, "ADHD");
+      this.btnBionic.onclick = () => {
         this.config.isBionic = !this.config.isBionic;
-        btnBionic.style.color = this.config.isBionic ? '#bae6fd' : '#fff';
-        this.refreshSpanContent();
+        this.applyBionic();
+        this.persist();
       };
 
-      const btnNoise = this.ui.addControlButton(ICONS.waves, THEME.soundscapes[0]);
-      btnNoise.onclick = () => {
+      this.btnNoise = this.ui.addControlButton(ICONS.waves, THEME.soundscapes[this.config.noiseIdx]);
+      this.btnNoise.onclick = () => {
         this.config.noiseIdx = (this.config.noiseIdx + 1) % THEME.soundscapes.length;
-        btnNoise.innerHTML = `${ICONS.waves} ${THEME.soundscapes[this.config.noiseIdx]}`;
-        this.audio.setNoiseMode(this.config.noiseIdx);
+        this.applyNoise();
+        this.persist();
       };
 
       const btnBrain = this.ui.addControlButton(ICONS.sparkles, "Brain (Mic Off)");
       this.brain.attachButton(btnBrain);
 
       this.btnPause = this.ui.addControlButton(ICONS.pause, "Pause");
-      this.btnPause.onclick = () => {
-        if (this.isPaused) this.resumeSystem();
-        else this.pauseSystem();
-      };
+      this.btnPause.onclick = () => (this.isPaused ? this.resumeSystem() : this.pauseSystem());
 
       const btnDash = this.ui.addControlButton(ICONS.home, "Dashboard");
-      btnDash.onclick = () => window.open('http://localhost:3000/dashboard', '_blank');
+      btnDash.onclick = () => window.open(DASHBOARD_URL, '_blank');
 
       const btnExit = this.ui.addControlButton(ICONS.x, "Exit", true);
       btnExit.onclick = () => this.destroy();
     }
 
-    // --- DOM Virtualization ---
-    // Only render the CURRENT chunk to the DOM. Massively saves memory on long articles.
+    // Preference application (also used to restore persisted prefs on boot)
+    applyPrefs() {
+      this.applySpeed();
+      this.applyColor();
+      this.applyBionic();
+      this.applyNoise();
+    }
+    applySpeed() {
+      const spd = THEME.speeds[this.config.speedIdx];
+      this.btnSpeed.innerHTML = `${ICONS.lightning} ${spd.toFixed(2)}x`;
+      this.audio.setSpeed(spd);
+    }
+    applyColor() {
+      const color = THEME.colors[this.config.colorIdx];
+      this.btnColor.style.color = color.solid;
+      if (this.activeWordSpan) {
+        this.activeWordSpan.style.color = color.solid;
+        this.activeWordSpan.style.textShadow = `0 0 15px ${color.val}`;
+      }
+    }
+    applyBionic() {
+      this.btnBionic.style.color = this.config.isBionic ? '#bae6fd' : '#fff';
+      this.refreshSpanContent();
+    }
+    applyNoise() {
+      this.btnNoise.innerHTML = `${ICONS.waves} ${THEME.soundscapes[this.config.noiseIdx]}`;
+      this.audio.setNoiseMode(this.config.noiseIdx);
+    }
+    persist() {
+      Utils.savePrefs(this.config);
+    }
+
+    bindKeys() {
+      this.keyHandler = (e) => {
+        if (e.code === 'Space') {
+          e.preventDefault();
+          this.isPaused ? this.resumeSystem() : this.pauseSystem();
+        } else if (e.code === 'Escape') {
+          this.destroy();
+        }
+      };
+      document.addEventListener('keydown', this.keyHandler, true);
+    }
+
+    // --- DOM virtualization: only the current chunk lives in the DOM ------
     renderCurrentChunk() {
-      this.ui.content.innerHTML = '';
+      this.ui.content.textContent = '';
       this.activeSpans = [];
       this.activeWordSpan = null;
-      
+
       const { words } = this.chunkTokens[this.currentChunkIdx];
       const pEl = document.createElement('p');
       pEl.style.marginBottom = '2rem';
-      
-      words.forEach((word, wordIdx) => {
+      const frag = document.createDocumentFragment();
+
+      words.forEach((word) => {
         const span = document.createElement('span');
         span.className = 'word';
         span.dataset.rawWord = word;
         span.dataset.bionicHtml = Utils.bionicFormat(word);
         span.innerHTML = this.config.isBionic ? span.dataset.bionicHtml : word;
-        
-        pEl.appendChild(span);
-        pEl.appendChild(document.createTextNode(' '));
+        frag.appendChild(span);
+        frag.appendChild(document.createTextNode(' '));
         this.activeSpans.push(span);
       });
-      
+
+      pEl.appendChild(frag);
       this.ui.content.appendChild(pEl);
     }
-    
+
     refreshSpanContent() {
       this.activeSpans.forEach(span => {
         span.innerHTML = this.config.isBionic ? span.dataset.bionicHtml : span.dataset.rawWord;
       });
     }
 
-    // --- Audio Queueing ---
-    async fetchNextChunk() {
-      if (!this.isQueueActive || this.currentChunkIdx >= this.chunks.length) return;
-      
-      const fetchIdx = this.audioQueue.length + (this.isPlaying ? 1 : 0) + this.currentChunkIdx;
-      if (fetchIdx >= this.chunks.length) return;
-      
-      try {
-        const url = await this.audio.fetchTTS(this.chunks[fetchIdx]);
-        this.audioQueue.push({ url, chunkIdx: fetchIdx });
-        
-        if (!this.isPlaying && !this.isPaused && this.isQueueActive) {
-          this.playNextInQueue();
-        }
-      } catch (err) {
-        console.error("Fetch failed", err);
-        this.ui.showToast(`TTS Error: ${err.message}`, true);
-      } finally {
-        if (this.audioQueue.length < 2) {
-          this.fetchNextChunk(); // Buffer ahead
-        }
+    // --- Audio queue: keep up to 2 chunks buffered ahead -------------------
+    fillBuffer() {
+      while (
+        this.isQueueActive &&
+        this.audioQueue.length + this.inflightFetches < 2 &&
+        this.nextFetchIdx < this.chunks.length
+      ) {
+        const fetchIdx = this.nextFetchIdx++;
+        this.inflightFetches++;
+        this.audio.fetchTTS(this.chunks[fetchIdx])
+          .then(url => {
+            if (!this.isQueueActive) { URL.revokeObjectURL(url); return; }
+            this.audioQueue.push({ url, chunkIdx: fetchIdx });
+            this.audioQueue.sort((a, b) => a.chunkIdx - b.chunkIdx);
+            if (!this.isPlaying && !this.isPaused) this.playNextInQueue();
+          })
+          .catch(err => {
+            console.error("[FocusReader] TTS fetch failed:", err);
+            this.ui.showToast(`TTS Error: ${err.message}`, true);
+          })
+          .finally(() => {
+            this.inflightFetches--;
+            this.fillBuffer();
+          });
       }
     }
 
@@ -766,75 +866,74 @@
         this.isPlaying = false;
         return;
       }
-      
+
       this.isPlaying = true;
       const { url, chunkIdx } = this.audioQueue.shift();
-      
-      // If we moved to a new chunk, virtualize the DOM
-      if (chunkIdx !== this.currentChunkIdx) {
+
+      if (chunkIdx !== this.currentChunkIdx || this.activeSpans.length === 0) {
         this.currentChunkIdx = chunkIdx;
         this.renderCurrentChunk();
       }
-      
+
       const currentTokens = this.chunkTokens[chunkIdx].tokens;
-      
-      this.audio.playVoice(url, 
-        // On Play
+      this.audio.playVoice(
+        url,
         () => {
-          this.animationFrameId = requestAnimationFrame(() => this.updateKaraoke(currentTokens));
-          this.fetchNextChunk(); // ensure buffer stays full
+          this.startKaraoke(currentTokens);
+          this.fillBuffer();
         },
-        // On End
         () => {
-          cancelAnimationFrame(this.animationFrameId);
+          this.stopKaraoke();
           this.playNextInQueue();
         }
       );
     }
 
-    updateKaraoke(tokens) {
-      if (!this.audio.voiceAudio || this.audio.voiceAudio.paused) {
-        if (this.isPlaying && this.isQueueActive) {
-          this.animationFrameId = requestAnimationFrame(() => this.updateKaraoke(tokens));
+    // Karaoke loop runs ONLY while audio is playing.
+    startKaraoke(tokens) {
+      this.stopKaraoke();
+      const step = () => {
+        const audio = this.audio.voiceAudio;
+        if (!audio || audio.paused || !audio.duration) {
+          this.animationFrameId = null;
+          return;
         }
-        return;
-      }
-      
-      const audio = this.audio.voiceAudio;
-      if (!audio.duration) {
-         this.animationFrameId = requestAnimationFrame(() => this.updateKaraoke(tokens));
-         return;
-      }
-      
-      const frac = audio.currentTime / audio.duration;
+        this.highlightWordAt(tokens, audio.currentTime / audio.duration);
+        this.animationFrameId = requestAnimationFrame(step);
+      };
+      this.animationFrameId = requestAnimationFrame(step);
+    }
+
+    stopKaraoke() {
+      if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+
+    highlightWordAt(tokens, frac) {
       const activeIdx = Utils.wordIndexAt(tokens, frac);
       const nextSpan = this.activeSpans[activeIdx];
-      
-      if (nextSpan && nextSpan !== this.activeWordSpan) {
-         if (this.activeWordSpan) {
-            this.activeWordSpan.style.color = 'var(--inactive-text)';
-            this.activeWordSpan.style.textShadow = 'none';
-         }
-         const color = THEME.colors[this.config.colorIdx];
-         nextSpan.style.color = color.solid;
-         nextSpan.style.textShadow = `0 0 15px ${color.val}`;
-         
-         const rect = nextSpan.getBoundingClientRect();
-         const vh = window.innerHeight;
-         // Note: Shadow DOM elements return coordinates relative to viewport just like normal elements
-         if (rect.top > vh * 0.6 || rect.top < vh * 0.3) {
-            nextSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
-         }
-         
-         this.activeWordSpan = nextSpan;
+      if (!nextSpan || nextSpan === this.activeWordSpan) return;
+
+      if (this.activeWordSpan) {
+        this.activeWordSpan.style.color = 'var(--inactive-text)';
+        this.activeWordSpan.style.textShadow = 'none';
       }
-      
-      this.animationFrameId = requestAnimationFrame(() => this.updateKaraoke(tokens));
+      const color = THEME.colors[this.config.colorIdx];
+      nextSpan.style.color = color.solid;
+      nextSpan.style.textShadow = `0 0 15px ${color.val}`;
+
+      const rect = nextSpan.getBoundingClientRect();
+      const vh = window.innerHeight;
+      if (rect.top > vh * 0.6 || rect.top < vh * 0.3) {
+        nextSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      this.activeWordSpan = nextSpan;
     }
 
     pauseSystem() {
       this.isPaused = true;
       this.audio.pause();
+      this.stopKaraoke();
       this.btnPause.innerHTML = `${ICONS.play} Play`;
     }
 
@@ -842,56 +941,135 @@
       this.isPaused = false;
       this.audio.resume();
       this.btnPause.innerHTML = `${ICONS.pause} Pause`;
-      if (!this.isPlaying && this.audioQueue.length > 0) {
+      if (this.audio.voiceAudio) {
+        this.startKaraoke(this.chunkTokens[this.currentChunkIdx].tokens);
+      } else if (this.audioQueue.length > 0) {
         this.playNextInQueue();
+      } else {
+        this.fillBuffer();
       }
     }
 
     destroy() {
       this.isQueueActive = false;
-      cancelAnimationFrame(this.animationFrameId);
+      this.stopKaraoke();
+      document.removeEventListener('keydown', this.keyHandler, true);
       this.audioQueue.forEach(i => URL.revokeObjectURL(i.url));
+      this.audioQueue = [];
       this.audio.destroy();
       this.brain.stop();
       this.ui.destroy();
-      window.hasInjectedFocusReader = false;
+      if (this.onExit) this.onExit();
     }
   }
 
   // ==========================================
-  // INITIALIZATION (SPA AWARE)
+  // LAUNCHER — the always-available entry pill
   // ==========================================
-  function attemptInit() {
-    if (window.hasInjectedFocusReader) return; // already got it
-    
-    const chunks = ArticleExtractor.extract();
-    if (chunks.length === 0) return;
-    
-    // Found an article! Prevent future checks and boot system.
-    window.hasInjectedFocusReader = true;
-    new FocusReaderController(chunks);
+  // A small, cheap floating pill on article pages. Nothing else exists until
+  // it's clicked: no AudioContext, no fetches, no credits spent.
+  class Launcher {
+    constructor(chunks) {
+      this.chunks = chunks;
+      this.controller = null;
+
+      this.host = document.createElement('div');
+      this.host.id = 'focusreader-launcher';
+      Object.assign(this.host.style, {
+        position: 'fixed',
+        bottom: '24px',
+        right: '24px',
+        zIndex: '2147483646'
+      });
+
+      const shadow = this.host.attachShadow({ mode: 'open' });
+      const style = document.createElement('style');
+      style.textContent = `
+        button {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 16px;
+          border: 1px solid rgba(255,255,255,0.15);
+          border-radius: 30px;
+          background: rgba(15, 15, 20, 0.85);
+          backdrop-filter: blur(12px);
+          color: #d8b4fe;
+          font: 600 13px system-ui, -apple-system, sans-serif;
+          cursor: pointer;
+          box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+          opacity: 0.75;
+          transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        button:hover {
+          opacity: 1;
+          transform: translateY(-2px) scale(1.03);
+          border-color: rgba(168, 85, 247, 0.5);
+          box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 20px rgba(168, 85, 247, 0.25);
+        }
+        button:active { transform: scale(0.97); }
+      `;
+      shadow.appendChild(style);
+
+      this.btn = document.createElement('button');
+      this.btn.innerHTML = `${ICONS.headphones} Focus (${Math.max(1, Math.round(this.chunks.join(' ').length / 950))} min)`;
+      this.btn.title = "Read this page aloud with FocusReader";
+      this.btn.onclick = () => this.start();
+      shadow.appendChild(this.btn);
+
+      document.body.appendChild(this.host);
+    }
+
+    async start() {
+      if (this.controller) return;
+      const token = await Utils.getToken();
+      if (!token) {
+        window.open(`${DASHBOARD_URL}/tools`, '_blank');
+        return;
+      }
+      this.host.style.display = 'none';
+      const prefs = await Utils.loadPrefs();
+      this.controller = new FocusReaderController(this.chunks, prefs, () => {
+        this.controller = null;
+        this.host.style.display = '';
+      });
+    }
+
+    destroy() {
+      if (this.controller) this.controller.destroy();
+      this.host.remove();
+    }
   }
 
-  // Check immediately
-  attemptInit();
+  // ==========================================
+  // INITIALIZATION (SPA-AWARE)
+  // ==========================================
+  let launcher = null;
 
-  // Check again for Single Page Apps (React/Next) that load DOM late
+  function attemptInit() {
+    if (launcher) return;
+    const chunks = ArticleExtractor.extract();
+    if (chunks.length === 0) return;
+    launcher = new Launcher(chunks);
+  }
+
+  attemptInit();
   setTimeout(attemptInit, 1000);
   setTimeout(attemptInit, 2500);
   setTimeout(attemptInit, 4000);
 
-  // Stay alive for SPA navigations: when the URL changes without a page
-  // load, give the new view a chance to boot the reader too.
+  // SPA navigations: re-extract for the new view (unless a session is live).
   let lastHref = location.href;
   setInterval(() => {
-    if (location.href !== lastHref) {
-      lastHref = location.href;
-      // Only boot if no controller is active — never stack a second widget
-      // over a running session (destroy() clears the flag).
-      if (!window.hasInjectedFocusReader) {
-        setTimeout(attemptInit, 800);
-        setTimeout(attemptInit, 2500);
-      }
+    if (location.href === lastHref) return;
+    lastHref = location.href;
+    if (launcher && !launcher.controller) {
+      launcher.destroy();
+      launcher = null;
+    }
+    if (!launcher) {
+      setTimeout(attemptInit, 800);
+      setTimeout(attemptInit, 2500);
     }
   }, 1500);
 
