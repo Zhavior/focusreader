@@ -8,6 +8,7 @@ const { streamChunkAudio, ElevenLabsError } = require("../services/elevenlabs.se
 const { synthesizeChunk, isLocalProviderEnabled, LocalTtsError } = require("../services/localTts.service");
 const { synthesizeOpenSourceChunk, isOpenSourceProviderEnabled, OpenSourceTtsError } = require("../services/openSourceTts.service");
 const { asyncHandler } = require("../utils/asyncHandler");
+const { ttsRateLimiter } = require("../middleware/rateLimiter");
 
 const router = Router();
 
@@ -23,10 +24,38 @@ const DB_PATH =
 let _db = null;
 function getDb() {
   if (!_db) {
-    _db = new Database(DB_PATH, { readonly: true });
+    _db = new Database(DB_PATH);
+    _db.pragma("busy_timeout = 3000"); // Next.js writes to the same WAL db
   }
   return _db;
 }
+
+// ---------------------------------------------------------------------------
+// Credit metering — mirrors frontend/lib/db.ts spendCredits(): atomic
+// check-and-insert in one transaction, so this route can never hand out
+// unmetered audio. Balance is SUM(delta) over the append-only ledger.
+// ---------------------------------------------------------------------------
+function getBalance(userId) {
+  const row = getDb()
+    .prepare("SELECT COALESCE(SUM(delta), 0) AS balance FROM credit_ledger WHERE user_id = ?")
+    .get(userId);
+  return row.balance;
+}
+
+function spendCredits(userId, amount, ref) {
+  const db = getDb();
+  const spend = db.transaction(() => {
+    const balance = getBalance(userId);
+    if (balance < amount) return null;
+    db.prepare(
+      "INSERT INTO credit_ledger (user_id, delta, reason, ref) VALUES (?, ?, 'spend_tts', ?)"
+    ).run(userId, -amount, ref);
+    return balance - amount;
+  });
+  return spend();
+}
+
+const MAX_TEXT_LENGTH = 200000;
 
 // ---------------------------------------------------------------------------
 // Token resolution — mirrors frontend/lib/db.ts resolveExtensionToken()
@@ -64,6 +93,7 @@ router.options("*", (req, res) => {
 // ---------------------------------------------------------------------------
 router.post(
   "/tts",
+  ttsRateLimiter,
   asyncHandler(async (req, res) => {
     cors(res);
 
@@ -82,6 +112,17 @@ router.post(
     const { text } = req.body || {};
     if (!text || !text.trim()) {
       return res.status(400).json({ error: "invalid_input", message: "text is required" });
+    }
+    if (text.length > MAX_TEXT_LENGTH) {
+      return res.status(400).json({ error: "invalid_input", message: `Text exceeds ${MAX_TEXT_LENGTH} characters.` });
+    }
+
+    const cost = text.length;
+    if (getBalance(userId) < cost) {
+      return res.status(402).json({
+        error: "insufficient_credits",
+        message: "Out of credits — open Billing to upgrade.",
+      });
     }
 
     const useOpenSource = isOpenSourceProviderEnabled() || (req.body.voiceId && String(req.body.voiceId).startsWith("opensource_"));
@@ -112,6 +153,16 @@ router.post(
       const status = err instanceof ElevenLabsError || err instanceof LocalTtsError || err instanceof OpenSourceTtsError ? (err.statusCode || 502) : 502;
       return res.status(status).json({ error: "tts_error", message: err.message });
     }
+
+    // Engine accepted — charge atomically (failed synthesis above costs nothing).
+    const remaining = spendCredits(userId, cost, `ext4000:${crypto.randomUUID()}`);
+    if (remaining === null) {
+      return res.status(402).json({
+        error: "insufficient_credits",
+        message: "Out of credits — open Billing to upgrade.",
+      });
+    }
+    res.setHeader("X-Credits-Remaining", String(remaining));
 
     res.status(200);
     res.setHeader("Content-Type", "audio/mpeg");
