@@ -1,14 +1,19 @@
 {
   "manifest_version": 3,
-  "name": "FocusReader - ADHD Bionic TTS",
+  "name": "Zhavior FocusReader",
   "version": "2.0.0",
-  "description": "Instantly convert any webpage into a dark-mode Bionic Reading format and listen with hyper-realistic TTS and Brown Noise.",
-  "permissions": ["activeTab", "scripting"],
+  "description": "The official Zhavior hyper-focus extension. AI-powered Bionic Reading, premium TTS, and smart article summarization.",
+  "permissions": ["activeTab", "scripting", "storage"],
   "host_permissions": ["http://localhost:3001/*"],
   "action": {
-    "default_title": "Activate FocusReader"
+    "default_popup": "popup.html",
+    "default_title": "Zhavior FocusReader"
   },
-  "background": {
-    "service_worker": "background.js"
-  }
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
 }

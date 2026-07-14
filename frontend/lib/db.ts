@@ -72,6 +72,29 @@ function createDb(): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status, created_at);
     CREATE INDEX IF NOT EXISTS idx_jobs_user ON jobs(user_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS notes (
+      id          TEXT PRIMARY KEY,
+      user_id     TEXT NOT NULL,
+      note        TEXT NOT NULL,
+      source      TEXT NOT NULL,
+      created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_notes_user ON notes(user_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS imports (
+      id          TEXT PRIMARY KEY,
+      text        TEXT NOT NULL,
+      created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS extension_tokens (
+      token_hash  TEXT PRIMARY KEY,
+      user_id     TEXT NOT NULL,
+      created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+      last_used_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_ext_tokens_user ON extension_tokens(user_id);
   `);
   // Additive migrations for databases created before these columns existed.
   try {
@@ -359,4 +382,114 @@ export function deleteTrack(id: string, userId: string): boolean {
     return true;
   }
   return false;
+}
+
+export interface Note {
+  id: string;
+  user_id: string;
+  note: string;
+  source: string;
+  created_at: string;
+}
+
+export function createNote(params: {
+  userId: string;
+  note: string;
+  source: string;
+}): Note {
+  const id = crypto.randomUUID();
+  getDb()
+    .prepare(
+      `INSERT INTO notes (id, user_id, note, source) VALUES (?, ?, ?, ?)`
+    )
+    .run(id, params.userId, params.note, params.source);
+    
+  return getDb().prepare(`SELECT * FROM notes WHERE id = ?`).get(id) as Note;
+}
+
+export function listNotes(userId: string, limit = 50): Note[] {
+  return getDb()
+    .prepare(`SELECT * FROM notes WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`)
+    .all(userId, limit) as Note[];
+}
+
+export interface Import {
+  id: string;
+  text: string;
+  created_at: string;
+}
+
+const MAX_IMPORT_CHARS = 200000;
+
+export function createImport(text: string): Import {
+  const db = getDb();
+  // Unauthenticated capture endpoint: keep it from becoming a disk-filler.
+  // Imports are claim-once and short-lived; purge anything over an hour old.
+  db.prepare(
+    `DELETE FROM imports WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 hour')`
+  ).run();
+
+  const id = crypto.randomUUID();
+  db.prepare(`INSERT INTO imports (id, text) VALUES (?, ?)`).run(
+    id,
+    text.slice(0, MAX_IMPORT_CHARS)
+  );
+  return db.prepare(`SELECT * FROM imports WHERE id = ?`).get(id) as Import;
+}
+
+/** One-time claim: returns the import and deletes it. */
+export function claimImport(id: string): Import | undefined {
+  const db = getDb();
+  const row = db
+    .prepare(`SELECT * FROM imports WHERE id = ?`)
+    .get(id) as Import | undefined;
+  if (row) db.prepare(`DELETE FROM imports WHERE id = ?`).run(id);
+  return row;
+}
+
+// ---------------------------------------------------------------------------
+// Extension tokens — opaque bearer credentials for the Chrome extension.
+//
+// The plaintext token (`frk_` + 64 hex chars) is shown to the user exactly
+// once and never stored; only its SHA-256 lands in the database. Clerk user
+// ids are NOT valid tokens — they are identifiers, not secrets.
+// ---------------------------------------------------------------------------
+
+function hashToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+/** Issues a fresh token for the user, revoking any previous ones. */
+export function issueExtensionToken(userId: string): string {
+  const token = `frk_${crypto.randomBytes(32).toString("hex")}`;
+  const db = getDb();
+  db.transaction(() => {
+    db.prepare(`DELETE FROM extension_tokens WHERE user_id = ?`).run(userId);
+    db.prepare(
+      `INSERT INTO extension_tokens (token_hash, user_id) VALUES (?, ?)`
+    ).run(hashToken(token), userId);
+  })();
+  return token;
+}
+
+/** Resolves a bearer token to a user id, or null if invalid/revoked. */
+export function resolveExtensionToken(token: string): string | null {
+  if (!token || !token.startsWith("frk_")) return null;
+  const db = getDb();
+  const row = db
+    .prepare(`SELECT user_id FROM extension_tokens WHERE token_hash = ?`)
+    .get(hashToken(token)) as { user_id: string } | undefined;
+  if (!row) return null;
+  db.prepare(
+    `UPDATE extension_tokens SET last_used_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE token_hash = ?`
+  ).run(hashToken(token));
+  return row.user_id;
+}
+
+export function revokeExtensionTokens(userId: string): void {
+  getDb().prepare(`DELETE FROM extension_tokens WHERE user_id = ?`).run(userId);
+}
+
+export function getImport(id: string): Import | undefined {
+  return getDb().prepare(`SELECT * FROM imports WHERE id = ?`).get(id) as Import | undefined;
 }

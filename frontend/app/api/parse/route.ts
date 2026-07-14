@@ -4,19 +4,37 @@ import mammoth from "mammoth";
 
 export async function POST(req: Request) {
   try {
-    const formData = await req.formData();
-    const file = formData.get("file") as File | null;
+    const contentType = req.headers.get("content-type") || "";
+    let arrayBuffer: ArrayBuffer;
+    let fileType = "";
+    let fileName = "";
 
-    if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    if (contentType.includes("application/json")) {
+      const { url } = await req.json();
+      if (!url) return NextResponse.json({ error: "No URL provided" }, { status: 400 });
+      
+      const res = await fetch(url);
+      if (!res.ok) return NextResponse.json({ error: "Failed to fetch remote document" }, { status: 400 });
+      
+      arrayBuffer = await res.arrayBuffer();
+      fileType = res.headers.get("content-type") || "";
+      fileName = url.split('/').pop() || "";
+    } else {
+      const formData = await req.formData();
+      const file = formData.get("file") as File | null;
+
+      if (!file) {
+        return NextResponse.json({ error: "No file provided" }, { status: 400 });
+      }
+      arrayBuffer = await file.arrayBuffer();
+      fileType = file.type;
+      fileName = file.name;
     }
-
-    const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     
     let text = "";
 
-    if (file.type === "application/pdf" || file.name.endsWith(".pdf")) {
+    if (fileType.includes("application/pdf") || fileName.endsWith(".pdf")) {
       // Parse PDF
       const pdfBuffer = new Uint8Array(arrayBuffer);
       const { text: extracted } = await extractText(pdfBuffer);
@@ -24,8 +42,8 @@ export async function POST(req: Request) {
       // typically it returns { totalPages, text: string | string[] }
       text = Array.isArray(extracted) ? extracted.join("\n") : (extracted as string || "");
     } else if (
-      file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || 
-      file.name.endsWith(".docx")
+      fileType.includes("application/vnd.openxmlformats-officedocument.wordprocessingml.document") || 
+      fileName.endsWith(".docx")
     ) {
       // Parse DOCX
       const result = await mammoth.extractRawText({ buffer });

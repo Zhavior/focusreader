@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useFormStatus } from "react-dom";
 import { createCheckoutAction } from "@/app/actions/stripe";
+import KaraokePlayer from "@/components/KaraokePlayer";
 
 // ─── Smoke cloud definitions ───────────────────────────────────────────────────
 const SMOKE_CLOUDS = [
@@ -188,7 +189,7 @@ export default function LandingPage() {
             )}
 
             <motion.h1
-              className="relative text-5xl font-extrabold tracking-tight sm:text-6xl md:text-7xl lg:text-8xl text-transparent bg-clip-text bg-[linear-gradient(to_right,theme(colors.neutral.100),theme(colors.indigo.200),theme(colors.neutral.400),theme(colors.neutral.100))] bg-[length:200%_auto] animate-[rainbow_5s_linear_infinite]"
+              className="relative text-5xl font-black tracking-tighter sm:text-6xl md:text-7xl lg:text-[5.5rem] leading-[1.05] text-transparent bg-clip-text bg-[linear-gradient(to_right,theme(colors.white),theme(colors.indigo.200),theme(colors.neutral.200),theme(colors.white))] bg-[length:200%_auto] animate-[rainbow_5s_linear_infinite]"
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, ease: "easeOut", delay: 0.15 }}
@@ -281,98 +282,30 @@ export default function LandingPage() {
 
 // ─── Demo Player ───────────────────────────────────────────────────────────────
 function DemoPlayer() {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [currentTime, setCurrentTime] = useState("0:00");
-  const [duration, setDuration] = useState("0:00");
-  const audioRef = useRef<HTMLAudioElement>(null);
-
-  const fmt = (s: number) =>
-    `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-
-  useEffect(() => {
-    const el = audioRef.current;
-    if (!el) return;
-    const onTime = () => {
-      setCurrentTime(fmt(el.currentTime));
-      setProgress(el.duration ? (el.currentTime / el.duration) * 100 : 0);
-    };
-    const onMeta = () => setDuration(fmt(el.duration));
-    const onEnded = () => { setIsPlaying(false); setProgress(0); setCurrentTime("0:00"); };
-    el.addEventListener("timeupdate", onTime);
-    el.addEventListener("loadedmetadata", onMeta);
-    el.addEventListener("ended", onEnded);
-    return () => {
-      el.removeEventListener("timeupdate", onTime);
-      el.removeEventListener("loadedmetadata", onMeta);
-      el.removeEventListener("ended", onEnded);
-    };
-  }, []);
-
-  const toggle = async () => {
-    const el = audioRef.current;
-    if (!el) return;
-    if (isPlaying) {
-      el.pause(); setIsPlaying(false);
-    } else {
-      setIsLoading(true);
-      try { await el.play(); setIsPlaying(true); }
-      catch { /* autoplay blocked or file missing */ }
-      finally { setIsLoading(false); }
-    }
-  };
-
+  const demoText = "Attention-Deficit/Hyperactivity Disorder is not a deficit of attention, but rather an issue of regulating it. People with ADHD can actually focus intensely on tasks that provide high dopamine and immediate feedback, a state known as hyperfocus. By stripping away distractions, increasing reading speed, and layering a mathematically perfect brown noise floor, FocusReader acts as a digital stimulant, artificially inducing flow state and tricking the brain into absorbing dense information effortlessly.";
+  
   return (
     <motion.section
-      className="mt-28 w-full max-w-4xl flex flex-col items-center"
+      className="mt-28 w-full max-w-4xl flex flex-col items-center px-4"
       initial={{ opacity: 0, y: 24 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.8, ease: "easeOut", delay: 0.7 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.8 }}
     >
-      <audio ref={audioRef} src="/demo.mp3" preload="metadata" />
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-semibold tracking-tight text-neutral-200">Hear the Difference</h2>
-        <p className="text-neutral-500 mt-2">1.5x Speed + Brown Noise Layering.</p>
+        <h2 className="text-2xl font-bold tracking-tight text-white">Experience the Vault</h2>
+        <p className="text-neutral-400 mt-2 text-sm">Hit play. Turn on Bionic Font and Hyperfocus Vault.</p>
       </div>
-      <Card className="w-full max-w-md bg-white/5 border-white/10 backdrop-blur-xl shadow-2xl overflow-hidden group hover:border-indigo-500/50 transition-colors duration-500">
-        <CardContent className="p-8 flex flex-col items-center justify-center space-y-6">
-          <div className="relative">
-            <motion.div
-              className="absolute inset-0 rounded-full"
-              style={{ background: "rgba(99,102,241,0.25)", filter: "blur(20px)" }}
-              animate={isPlaying ? { scale: [1, 1.4, 1], opacity: [0.4, 0.7, 0.4] } : { scale: 1 }}
-              transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-            />
-            <button
-              onClick={toggle}
-              aria-label={isPlaying ? "Pause demo" : "Play demo"}
-              className="relative flex h-20 w-20 items-center justify-center rounded-full bg-white text-indigo-900 hover:scale-105 active:scale-95 transition-transform duration-200 shadow-xl"
-            >
-              {isLoading ? <Loader2 className="h-7 w-7 animate-spin" /> :
-               isPlaying ? <Pause className="h-8 w-8" fill="currentColor" /> :
-                           <Play className="h-8 w-8 ml-1" fill="currentColor" />}
-            </button>
-          </div>
-          <div className="w-full space-y-2">
-            <div
-              className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden cursor-pointer"
-              onClick={(e) => {
-                const el = audioRef.current;
-                if (!el?.duration) return;
-                const r = e.currentTarget.getBoundingClientRect();
-                el.currentTime = ((e.clientX - r.left) / r.width) * el.duration;
-              }}
-            >
-              <motion.div className="h-full bg-indigo-500 rounded-full" style={{ width: `${progress}%` }} transition={{ duration: 0.1 }} />
-            </div>
-            <div className="flex justify-between text-xs text-neutral-500 font-mono">
-              <span>{currentTime}</span>
-              <span>{duration || "—"}</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      
+      <div className="w-full max-w-3xl bg-[#080a0c] p-1 rounded-2xl border border-white/5 shadow-2xl relative">
+        <div className="absolute -inset-1 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-2xl blur-lg opacity-50"></div>
+        <div className="relative z-10 bg-[#0b0d10] rounded-2xl border border-white/5 p-4 sm:p-6 shadow-[0_0_40px_rgba(0,0,0,0.8)]">
+          <KaraokePlayer 
+            src="/demo.mp3" 
+            text={demoText}
+          />
+        </div>
+      </div>
     </motion.section>
   );
 }

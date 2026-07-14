@@ -27,7 +27,7 @@ export default async function BillingPage() {
   const isPremium = billing.plan === "premium";
 
   return (
-    <main className="min-h-screen bg-surface">
+    <main className="relative">
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-16">
         <header className="flex flex-col gap-2">
           <div className="flex items-center gap-2 text-brand">

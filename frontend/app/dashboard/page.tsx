@@ -1,17 +1,20 @@
 "use client";
 
 import { UserButton } from "@clerk/nextjs";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Card, CardContent } from "@/components/ui/card";
-import { Play, Loader2, Volume2, FastForward, Activity, Upload, Download } from "lucide-react";
+import { Play, Loader2, Volume2, FastForward, Activity, Upload, Download, Chrome } from "lucide-react";
 import TrackLibrary from "@/components/TrackLibrary";
 import KaraokePlayer from "@/components/KaraokePlayer";
 import { estimateLabel } from "@/lib/duration";
 
-export default function Dashboard() {
+function DashboardContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [text, setText] = useState("");
   const [speed, setSpeed] = useState([1.5]);
   const [background, setBackground] = useState<"silence" | "brown_noise" | "binaural">("brown_noise");
@@ -40,6 +43,23 @@ export default function Dashboard() {
     refreshCredits();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [libraryVersion]);
+
+  useEffect(() => {
+    const importId = searchParams?.get("import");
+    if (importId) {
+      setIsGenerating(true); // show some loading state
+      fetch(`/api/extension-import/${importId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.text) {
+            setText(data.text);
+            // Clean up URL
+            router.replace("/dashboard");
+          }
+        })
+        .finally(() => setIsGenerating(false));
+    }
+  }, [searchParams, router]);
 
   const charCount = text.length;
   const overBudget = credits !== null && charCount > credits;
@@ -146,11 +166,6 @@ export default function Dashboard() {
 
   return (
     <main className="relative min-h-screen bg-[#0b0d10] py-12 px-4 sm:px-6">
-      {/* Top Left Corner: Profile & Settings / Log out */}
-      <div className="absolute top-6 left-6 flex items-center gap-2">
-        <UserButton appearance={{ elements: { userButtonAvatarBox: "w-9 h-9" } }} />
-        <span className="text-sm font-medium text-neutral-400 hidden sm:inline">Profile & Settings</span>
-      </div>
 
       <div className="max-w-3xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-1000 ease-out">
             
@@ -194,6 +209,28 @@ export default function Dashboard() {
                 />
               </label>
             </header>
+
+            {/* Chrome Extension Banner */}
+            <div className="relative group cursor-pointer" onClick={() => window.location.href = '/dashboard/tools'}>
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl blur opacity-30 group-hover:opacity-60 transition duration-500"></div>
+              <div className="relative flex flex-col sm:flex-row items-center justify-between bg-[#131619]/90 backdrop-blur-sm border border-white/10 rounded-xl p-6 gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex shrink-0 items-center justify-center w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
+                    <Chrome className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white tracking-tight">Get the Zhavior Chrome Extension</h3>
+                    <p className="text-sm text-neutral-400 mt-1 max-w-lg">
+                      <strong className="text-indigo-300">Voice-Controlled AI Brain</strong> • Hands-Free Scrolling • Universal Media Sync • ADHD Bionic Text • Instantly push Voice Notes to your Dashboard.
+                    </p>
+                  </div>
+                </div>
+                <Button className="shrink-0 w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white rounded-full px-6 font-semibold shadow-[0_0_20px_-5px_rgba(59,130,246,0.5)] border border-blue-400/20">
+                  <Download className="w-4 h-4 mr-2" />
+                  Learn More
+                </Button>
+              </div>
+            </div>
 
             {/* Main Editor */}
             <div className="space-y-6">
@@ -338,5 +375,13 @@ export default function Dashboard() {
             </div>
           </div>
     </main>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0b0d10] flex items-center justify-center text-white"><Loader2 className="w-8 h-8 animate-spin" /></div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }
