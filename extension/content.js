@@ -21,9 +21,19 @@
   if (window.__frScriptLoaded) return;
   window.__frScriptLoaded = true;
 
-  const API_BASE = "http://localhost:3001";   // Next.js frontend (dashboard, notes)
-  const TTS_BASE  = "http://localhost:4000";   // Express backend (TTS — no proxy deadlock)
-  const DASHBOARD_URL = `${API_BASE}/dashboard`;
+  // Server endpoints. Defaults are local dev; production overrides live in
+  // chrome.storage.sync (set once at install/login) so the same build ships
+  // to the Web Store without code changes. All consumers read these lets at
+  // call time, so the async override lands before any user-initiated fetch.
+  let API_BASE = "http://localhost:3001";   // Next.js frontend (dashboard, notes)
+  let TTS_BASE  = "http://localhost:4000";  // Express backend (TTS — no proxy deadlock)
+  let DASHBOARD_URL = `${API_BASE}/dashboard`;
+  try {
+    chrome?.storage?.sync?.get(["zhaviorApiBase", "zhaviorTtsBase"], (res) => {
+      if (res?.zhaviorApiBase) { API_BASE = res.zhaviorApiBase.replace(/\/$/, ""); DASHBOARD_URL = `${API_BASE}/dashboard`; }
+      if (res?.zhaviorTtsBase) { TTS_BASE = res.zhaviorTtsBase.replace(/\/$/, ""); }
+    });
+  } catch { /* storage unavailable — keep dev defaults */ }
 
   // ==========================================
   // THEME (visual truth preserved from v2)
