@@ -5,6 +5,7 @@ const cors = require("cors");
 const helmet = require("helmet");
 
 const ttsRoutes = require("./routes/tts.routes");
+const extensionRoutes = require("./routes/extension.routes");
 const { errorHandler } = require("./middleware/errorHandler");
 
 const app = express();
@@ -14,6 +15,24 @@ const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:3000")
   .split(",")
   .map((origin) => origin.trim());
 
+// Mount JSON parser first so req.body is available for extension routes
+app.use(express.json({ limit: "2mb" }));
+
+// Extension routes can be called from any web origin (e.g. foxsports.com content scripts)
+app.use(
+  "/api/extension",
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+  (req, res, next) => {
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    next();
+  },
+  extensionRoutes
+);
+
 app.use(helmet());
 app.use(
   cors({
@@ -21,7 +40,6 @@ app.use(
     methods: ["GET", "POST"],
   })
 );
-app.use(express.json({ limit: "2mb" }));
 
 app.use("/api/tts", ttsRoutes);
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Download, Library, Loader2, Music, Trash2 } from "lucide-react";
+import { Download, Library, Loader2, Music, Trash2, ExternalLink } from "lucide-react";
 import { estimateLabel, estimateSeconds, formatDuration } from "@/lib/duration";
 import KaraokePlayer from "@/components/KaraokePlayer";
 
@@ -40,6 +40,7 @@ interface Track {
   status: "processing" | "ready" | "failed";
   size_bytes: number;
   created_at: string;
+  source_url?: string | null;
 }
 
 const BACKGROUND_LABELS: Record<string, string> = {
@@ -58,65 +59,71 @@ export default function TrackLibrary({
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [playingText, setPlayingText] = useState<string>("");
 
-  const openPlayer = async (id: string) => {
-    setPlayingId(id);
-    setPlayingText("");
-    try {
-      const res = await fetch(`/api/tracks/${id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setPlayingText(data.track?.text ?? "");
-      }
-    } catch {
-      // Karaoke text is an enhancement — audio still plays without it.
-    }
-  };
-
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch("/api/tracks");
-      if (!res.ok) return;
-      const data = await res.json();
-      setTracks(data.tracks);
-    } catch {
-      // Library is a convenience surface — fail quietly, keep whatever we had.
-    }
+  const load = useCallback(() => {
+    fetch("/api/tracks")
+      .then((r) => r.json())
+      .then((data) => setTracks(data.tracks || []))
+      .catch((err) => {
+        console.error("Failed to load tracks:", err);
+        setTracks([]);
+      });
   }, []);
 
   useEffect(() => {
     load();
   }, [load, refreshSignal]);
 
+  const openPlayer = async (id: string) => {
+    try {
+      const res = await fetch(`/api/tracks/${id}`);
+      const data = await res.json();
+      setPlayingText(data.track?.text || "");
+      setPlayingId(id);
+    } catch {
+      /* ignore */
+    }
+  };
+
   const handleDelete = async (id: string) => {
-    setTracks((prev) => prev?.filter((t) => t.id !== id) ?? null);
     if (playingId === id) setPlayingId(null);
     clearPosition(id);
     await fetch(`/api/tracks/${id}`, { method: "DELETE" }).catch(() => load());
+    load();
   };
 
   if (tracks === null) {
     return (
-      <div className="flex items-center gap-2 text-sm text-neutral-600">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Loading your library...
+      <div className="flex h-32 items-center justify-center text-neutral-500">
+        <Loader2 className="h-5 w-5 animate-spin" />
       </div>
     );
   }
 
   if (tracks.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-neutral-600">
-        Your generated tracks will appear here — they survive refresh now.
+      <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-white/10 bg-[#131619] p-10 text-center">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/5 text-neutral-500">
+          <Library className="h-6 w-6" />
+        </div>
+        <div>
+          <p className="text-sm font-medium text-neutral-300">
+            Your library is empty
+          </p>
+          <p className="text-xs text-neutral-500">
+            Paste text above and hit Generate to create your first track.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 text-neutral-400">
-        <Library className="h-4 w-4" />
-        <h2 className="text-sm font-medium">Your Library</h2>
-        <span className="text-xs text-neutral-600">
+      <div className="flex items-center justify-between px-1">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-400">
+          Your Library
+        </h2>
+        <span className="text-xs text-neutral-500">
           ({tracks.length} ·{" "}
           {formatDuration(
             tracks.reduce((s, t) => s + estimateSeconds(t.chars, t.speed), 0)
@@ -137,10 +144,23 @@ export default function TrackLibrary({
                   <Music className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-neutral-200">
-                    {track.title || "Untitled track"}
-                  </p>
-                  <p className="text-xs text-neutral-500">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-medium text-neutral-200">
+                      {track.title || "Untitled track"}
+                    </p>
+                    {track.source_url && (
+                      <a
+                        href={track.source_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded bg-purple-500/20 px-1.5 py-0.5 text-[10px] font-bold text-purple-300 border border-purple-500/40 hover:bg-purple-500/30 transition-colors shrink-0"
+                        title={track.source_url}
+                      >
+                        <ExternalLink className="w-2.5 h-2.5" /> Source
+                      </a>
+                    )}
+                  </div>
+                  <p className="text-xs text-neutral-500 mt-0.5">
                     ≈ {estimateLabel(track.chars, track.speed)} · {track.speed}x ·{" "}
                     {BACKGROUND_LABELS[track.background] ?? track.background} ·{" "}
                     {new Date(track.created_at).toLocaleDateString()}

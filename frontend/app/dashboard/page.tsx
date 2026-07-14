@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Card, CardContent } from "@/components/ui/card";
-import { Play, Loader2, Volume2, FastForward, Activity, Upload, Download, Chrome } from "lucide-react";
+import { Play, Loader2, Volume2, FastForward, Activity, Upload, Download, Chrome, BookOpen } from "lucide-react";
 import TrackLibrary from "@/components/TrackLibrary";
 import KaraokePlayer from "@/components/KaraokePlayer";
 import { estimateLabel } from "@/lib/duration";
@@ -209,6 +209,31 @@ function DashboardContent() {
                 />
               </label>
             </header>
+
+            {/* Zhavior Document Studio Banner */}
+            <div className="relative group cursor-pointer mb-6" onClick={() => window.location.href = '/dashboard/reader'}>
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl blur opacity-30 group-hover:opacity-60 transition duration-500"></div>
+              <div className="relative flex flex-col sm:flex-row items-center justify-between bg-[#131619]/90 backdrop-blur-sm border border-purple-500/30 rounded-xl p-6 gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex shrink-0 items-center justify-center w-12 h-12 rounded-full bg-purple-500/20 text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.3)]">
+                    <BookOpen className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-bold text-white tracking-tight">Open Zhavior Document Studio</h3>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40">NEW 100/100</span>
+                    </div>
+                    <p className="text-sm text-neutral-400 mt-1 max-w-lg">
+                      <strong className="text-purple-300">Spatial XY-Cut PDF & DOCX Reader</strong> • Stereo Binaural Soundscapes • Exact Word Karaoke Sync • Bionic Reading • Instant Voice Notes.
+                    </p>
+                  </div>
+                </div>
+                <Button className="shrink-0 w-full sm:w-auto bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-full px-6 font-semibold shadow-[0_0_20px_-5px_rgba(168,85,247,0.6)] border border-purple-400/20">
+                  <BookOpen className="w-4 h-4 mr-2" />
+                  Launch Studio
+                </Button>
+              </div>
+            </div>
 
             {/* Chrome Extension Banner */}
             <div className="relative group cursor-pointer" onClick={() => window.location.href = '/dashboard/tools'}>

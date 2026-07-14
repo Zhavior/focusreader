@@ -24,6 +24,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  const libraryBtn = document.getElementById('libraryBtn');
+
   saveBtn.addEventListener('click', () => {
     const token = tokenInput.value.trim();
     if (!token) {
@@ -41,6 +43,10 @@ document.addEventListener('DOMContentLoaded', () => {
       setStatus('Logged out.');
       updateUI();
     });
+  });
+
+  libraryBtn.addEventListener('click', () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL('library.html') });
   });
 
   updateUI();

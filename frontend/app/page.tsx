@@ -362,11 +362,12 @@ function PricingSlider() {
                     <Brain className="h-10 w-10 text-indigo-400" />
                   </motion.div>
                   <div className="space-y-1 text-center">
+                    <span className="inline-block px-2 py-0.5 rounded bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-[10px] font-bold uppercase tracking-wider mb-1">Beta Price</span>
                     <h3 className="text-xl font-bold text-white">Monthly</h3>
                     <p className="text-neutral-400 text-sm">100,000 characters/mo. Cancel anytime.</p>
                   </div>
                   <div className="text-5xl font-black text-white">
-                    $29<span className="text-xl text-neutral-500 font-normal">/mo</span>
+                    $19<span className="text-2xl">.99</span><span className="text-xl text-neutral-500 font-normal">/mo</span>
                   </div>
                   <form action={createCheckoutAction} className="w-full pt-2">
                     <CheckoutButton label="Start Monthly" />
@@ -405,15 +406,16 @@ function PricingSlider() {
                     <Zap className="h-10 w-10 text-amber-400" />
                   </motion.div>
                   <div className="space-y-1 text-center">
+                    <span className="inline-block px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-bold uppercase tracking-wider mb-1">Beta Price</span>
                     <h3 className="text-xl font-bold text-white">6 Months</h3>
                     <p className="text-neutral-400 text-sm">Unlimited focus. One payment. Zero regrets.</p>
                   </div>
                   <div className="text-center">
                     <div className="text-5xl font-black text-white">
-                      $69<span className="text-2xl">.99</span>
+                      $89<span className="text-2xl">.99</span>
                     </div>
-                    <p className="text-amber-400 text-sm font-medium mt-1">$11.67/mo — 6 months billed once</p>
-                    <p className="text-neutral-600 text-xs mt-0.5 line-through">$174 if paid monthly</p>
+                    <p className="text-amber-400 text-sm font-medium mt-1">$15/mo — 6 months billed once</p>
+                    <p className="text-neutral-600 text-xs mt-0.5 line-through">$119.94 if paid monthly</p>
                   </div>
                   <form action={createCheckoutAction} className="w-full pt-2">
                     <CheckoutButton label="Lock In the Deal" />
@@ -451,6 +453,7 @@ function PricingSlider() {
             <ChevronRight className="h-3 w-3" />
           </motion.div>
         )}
+        <p className="text-xs text-neutral-600 mt-1">🔒 Beta pricing — locks in your rate for life</p>
       </div>
     </div>
   );

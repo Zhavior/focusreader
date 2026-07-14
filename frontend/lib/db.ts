@@ -110,6 +110,11 @@ function createDb(): Database.Database {
   } catch {
     // Column already exists.
   }
+  try {
+    db.exec(`ALTER TABLE tracks ADD COLUMN source_url TEXT DEFAULT NULL`);
+  } catch {
+    // Column already exists.
+  }
   return db;
 }
 
@@ -138,6 +143,7 @@ export interface Track {
   size_bytes: number;
   created_at: string;
   text: string;
+  source_url?: string | null;
 }
 
 export function audioPathFor(trackId: string): string {
@@ -151,12 +157,13 @@ export function createTrack(params: {
   speed: number;
   background: string;
   text?: string;
+  sourceUrl?: string | null;
 }): Track {
   const id = crypto.randomUUID();
   getDb()
     .prepare(
-      `INSERT INTO tracks (id, user_id, title, chars, speed, background, status, text)
-       VALUES (?, ?, ?, ?, ?, ?, 'processing', ?)`
+      `INSERT INTO tracks (id, user_id, title, chars, speed, background, status, text, source_url)
+       VALUES (?, ?, ?, ?, ?, ?, 'processing', ?, ?)`
     )
     .run(
       id,
@@ -165,7 +172,8 @@ export function createTrack(params: {
       params.chars,
       params.speed,
       params.background,
-      params.text ?? ""
+      params.text ?? "",
+      params.sourceUrl ?? null
     );
   return getTrack(id, params.userId) as Track;
 }
@@ -191,7 +199,7 @@ export function listTracks(userId: string, limit = 50): Omit<Track, "text">[] {
   // list view doesn't need it; the karaoke player fetches it per-track.
   return getDb()
     .prepare(
-      `SELECT id, user_id, title, chars, speed, background, status, size_bytes, created_at
+      `SELECT id, user_id, title, chars, speed, background, status, size_bytes, created_at, source_url
        FROM tracks WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`
     )
     .all(userId, limit) as Omit<Track, "text">[];

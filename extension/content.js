@@ -21,7 +21,8 @@
   if (window.__frScriptLoaded) return;
   window.__frScriptLoaded = true;
 
-  const API_BASE = "http://localhost:3001";
+  const API_BASE = "http://localhost:3001";   // Next.js frontend (dashboard, notes)
+  const TTS_BASE  = "http://localhost:4000";   // Express backend (TTS — no proxy deadlock)
   const DASHBOARD_URL = `${API_BASE}/dashboard`;
 
   // ==========================================
@@ -35,14 +36,20 @@
       { name: "Hot Pink", val: "rgba(236, 72, 153, 0.8)", solid: "#fbcfe8" }
     ],
     speeds: [1.0, 1.25, 1.5, 2.0],
-    soundscapes: ["Sound: Off", "Brown Noise", "Pink Noise", "White Noise", "Light Rain", "Heavy Rain"]
+    soundscapes: ["Sound: Off", "Brown Noise", "Pink Noise", "White Noise", "Light Rain", "Heavy Rain"],
+    voices: [
+      { name: "Voice: Female (US)", id: "Samantha", elevenId: "EXAVITQu4vr4xnSDxMaL" },
+      { name: "Voice: Male (US Standard)", id: "Reed (English (US))", elevenId: "ErXwobaYiN019PkySvjV" },
+      { name: "Voice: Male (Warm & Deep)", id: "Evan", elevenId: "nPczCjzI2XWHr1WexmYd" },
+      { name: "Voice: Male (UK British)", id: "Daniel", elevenId: "ONwK4e9ZLuTAKqWW03F9" },
+      { name: "Voice: Female (Warm & Calm)", id: "Flo (English (US))", elevenId: "21m00Tcm4TlvDq8ikWAM" }
+    ]
   };
 
   const ICONS = {
+    voice: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>`,
     lightning: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`,
-    palette: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>`,
-    brain: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/></svg>`,
-    sparkles: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>`,
+    adhd: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/></svg>`,
     pause: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`,
     play: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
     home: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
@@ -72,8 +79,11 @@
     buildWordTimings(text) {
       const words = text.split(/\s+/).filter(Boolean);
       const raw = words.map(word => {
-        let weight = word.length + 1;
-        if (/[.,!?:;]["']?$/.test(word)) weight += 8; // punctuation pause
+        // Acoustic duration model: base word duration + non-linear syllabic length + punctuation prosody
+        let weight = Math.pow(word.length, 0.78) * 45 + 120;
+        if (/[.?!]["']?$/.test(word)) weight += 420;      // full stop sentence pause
+        else if (/[,;:]["']?$/.test(word)) weight += 220; // clause comma/colon pause
+        else if (/[—–"-]$/.test(word)) weight += 120;     // dash/quote pause
         return { word, weight };
       });
       const totalWeight = raw.reduce((sum, t) => sum + t.weight, 0);
@@ -102,17 +112,25 @@
       return lo;
     },
 
+    escapeAttr(str) {
+      return (str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    },
+
     getToken() {
+      if (Utils._cachedToken !== undefined) return Promise.resolve(Utils._cachedToken);
       return new Promise((resolve) => {
         if (!chrome?.storage?.sync) return resolve('');
-        chrome.storage.sync.get(['zhaviorToken'], res => resolve(res.zhaviorToken || ''));
+        chrome.storage.sync.get(['zhaviorToken'], res => {
+          Utils._cachedToken = res.zhaviorToken || '';
+          resolve(Utils._cachedToken);
+        });
       });
     },
 
-    /** Persisted user preferences (speed/color/bionic/noise survive sessions). */
+    /** Persisted user preferences (speed/color/bionic/noise/voice survive sessions). */
     loadPrefs() {
       return new Promise((resolve) => {
-        const defaults = { speedIdx: 0, colorIdx: 0, noiseIdx: 0, isBionic: true };
+        const defaults = { speedIdx: 0, colorIdx: 0, noiseIdx: 0, isBionic: true, voiceIdx: 0, noiseVolume: 0.35 };
         if (!chrome?.storage?.sync) return resolve(defaults);
         chrome.storage.sync.get(['zhaviorPrefs'], res =>
           resolve({ ...defaults, ...(res.zhaviorPrefs || {}) })
@@ -122,6 +140,44 @@
 
     savePrefs(prefs) {
       try { chrome?.storage?.sync?.set({ zhaviorPrefs: prefs }); } catch { /* best-effort */ }
+    },
+
+    /** Automatically log/save article to Reading Library when opened */
+    recordVisit(item) {
+      if (!chrome?.storage?.local) return;
+      chrome.storage.local.get(['zhaviorLibrary'], res => {
+        let list = res.zhaviorLibrary || [];
+        const existingIdx = list.findIndex(i => i.url === item.url);
+        if (existingIdx >= 0) {
+          list[existingIdx] = { ...list[existingIdx], ...item, isFavorite: list[existingIdx].isFavorite || item.isFavorite };
+        } else {
+          list.unshift(item);
+        }
+        chrome.storage.local.set({ zhaviorLibrary: list });
+      });
+    },
+
+    toggleFavorite(url, cb) {
+      if (!chrome?.storage?.local) return;
+      chrome.storage.local.get(['zhaviorLibrary'], res => {
+        let list = res.zhaviorLibrary || [];
+        const existingIdx = list.findIndex(i => i.url === url);
+        let newStatus = true;
+        if (existingIdx >= 0) {
+          list[existingIdx].isFavorite = !list[existingIdx].isFavorite;
+          newStatus = list[existingIdx].isFavorite;
+        } else {
+          list.unshift({
+            id: url,
+            title: document.title || window.location.hostname,
+            url: window.location.href,
+            domain: window.location.hostname,
+            date: new Date().toISOString(),
+            isFavorite: true
+          });
+        }
+        chrome.storage.local.set({ zhaviorLibrary: list }, () => { if (cb) cb(newStatus); });
+      });
     }
   };
 
@@ -130,49 +186,87 @@
   // ==========================================
   class ArticleExtractor {
     static extract() {
-      const articleNode = document.querySelector('article, [role="main"], main') || document.body;
-      const rawParagraphs = articleNode.querySelectorAll('p, h2, h3, li');
+      const articleNode = document.querySelector('article, [role="main"], main, .article-body, .story-body, .article-content, .post-content, #article-body, .entry-content') || document.body;
+      const rawParagraphs = articleNode.querySelectorAll('p, h1, h2, h3, h4, blockquote, li, .paragraph, .article-paragraph');
       const validParagraphs = [];
 
-      const badSelector = 'nav, footer, aside, .sidebar, .comments, .ad, .promo, [id*="nav"], [id*="footer"], [class*="ad-"], [class*="sponsored"]';
+      const badSelector = 'nav, footer, aside, figure, .sidebar, .comments, .ad, .promo, .social, [id*="nav"], [id*="footer"], [class*="ad-"], [class*="sponsored"], [class*="newsletter"]';
       const ctaKeywords = ['in your inbox', 'join medium', 'get updates', 'subscribe to', 'sign up', 'read more from', 'written by', 'newsletter'];
 
       rawParagraphs.forEach(p => {
+        const text = (p.innerText || p.textContent || '').trim();
+        if (text.length < 5) return;
         if (p.closest(badSelector)) return;
-        const text = p.innerText || p.textContent || '';
+
         let linkTextLen = 0;
         p.querySelectorAll('a').forEach(a => { linkTextLen += (a.innerText || "").length; });
         const linkDensity = linkTextLen / Math.max(text.length, 1);
 
         const lowerText = text.toLowerCase();
         if (ctaKeywords.some(keyword => lowerText.includes(keyword))) return;
-        if (text.trim().length > 30 && linkDensity < 0.3) {
-          validParagraphs.push(text.trim());
+        if (linkDensity < 0.55) {
+          validParagraphs.push(text);
         }
       });
 
-      // Sentence-aware chunking to ~400 chars per TTS request.
-      const chunks = [];
-      let currentChunk = [];
-      let currentLength = 0;
+      if (validParagraphs.length === 0) return { paragraphs: [], chunks: [], chunkWordRanges: [] };
 
-      validParagraphs.forEach(p => {
-        p.split(/(?<=[.?!])\s+/).forEach(s => {
-          const trimmed = s.trim();
-          if (trimmed.length > 10) {
-            if (currentLength + trimmed.length > 400 && currentChunk.length > 0) {
-              chunks.push(currentChunk.join(' '));
-              currentChunk = [];
-              currentLength = 0;
+      // Build sentences across all paragraphs, keeping exact word counts
+      const chunks = [];
+      const chunkWordRanges = [];
+      let currentWords = [];
+      let currentStartWordIdx = 0;
+      let runningWordIdx = 0;
+
+      validParagraphs.forEach(pText => {
+        pText.split(/(?<=[.?!])\s+/).forEach(sentence => {
+          const trimmed = sentence.trim();
+          if (!trimmed) return;
+          const sWords = trimmed.split(/\s+/).filter(Boolean);
+          if (sWords.length === 0) return;
+
+          const maxLimit = chunks.length === 0 ? 80 : 340;
+          const maxWords = chunks.length === 0 ? 14 : 55;
+
+          // If adding this sentence exceeds chunk limit and we already have words buffered, flush
+          if ((currentWords.join(' ').length + trimmed.length + 1 > maxLimit || currentWords.length + sWords.length > maxWords) && currentWords.length > 0) {
+            const chunkStr = currentWords.join(' ');
+            if (chunkStr.length > 2 && /[a-zA-Z0-9]/.test(chunkStr)) {
+              chunks.push(chunkStr);
+              chunkWordRanges.push({ startIdx: currentStartWordIdx, endIdx: runningWordIdx - 1 });
             }
-            currentChunk.push(trimmed);
-            currentLength += trimmed.length;
+            currentWords = [];
+            currentStartWordIdx = runningWordIdx;
+          }
+
+          // If a single sentence itself exceeds maxWords (e.g. long title without periods), sub-split it by words
+          if (sWords.length > maxWords && currentWords.length === 0) {
+            for (let i = 0; i < sWords.length; i += maxWords) {
+              const sub = sWords.slice(i, i + maxWords);
+              const chunkStr = sub.join(' ');
+              if (chunkStr.length > 2 && /[a-zA-Z0-9]/.test(chunkStr)) {
+                chunks.push(chunkStr);
+                chunkWordRanges.push({ startIdx: runningWordIdx + i, endIdx: runningWordIdx + i + sub.length - 1 });
+              }
+            }
+            runningWordIdx += sWords.length;
+            currentStartWordIdx = runningWordIdx;
+          } else {
+            currentWords.push(...sWords);
+            runningWordIdx += sWords.length;
           }
         });
       });
-      if (currentChunk.length > 0) chunks.push(currentChunk.join(' '));
 
-      return chunks;
+      if (currentWords.length > 0) {
+        const chunkStr = currentWords.join(' ');
+        if (chunkStr.length > 2 && /[a-zA-Z0-9]/.test(chunkStr)) {
+          chunks.push(chunkStr);
+          chunkWordRanges.push({ startIdx: currentStartWordIdx, endIdx: runningWordIdx - 1 });
+        }
+      }
+
+      return { paragraphs: validParagraphs, chunks, chunkWordRanges };
     }
   }
 
@@ -182,6 +276,11 @@
   // Each mode renders 8 seconds of noise ONCE into an AudioBuffer, then loops
   // it via AudioBufferSourceNode. After generation there is no per-sample JS
   // at all. Buffers are cached per mode.
+  // ==========================================
+  // SOUNDSCAPES — High-Quality Stereo Binaural DSP Buffers
+  // ==========================================
+  // Each mode renders 8 seconds of binaural stereo (2-channel) noise ONCE into
+  // an AudioBuffer, then loops seamlessly via AudioBufferSourceNode with 200ms cosine crossfade.
   const Soundscapes = {
     LOOP_SECONDS: 8,
     cache: new Map(),
@@ -189,56 +288,82 @@
     getBuffer(ctx, mode) {
       if (this.cache.has(mode)) return this.cache.get(mode);
       const length = ctx.sampleRate * this.LOOP_SECONDS;
-      const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
-      const data = buffer.getChannelData(0);
+      const buffer = ctx.createBuffer(2, length, ctx.sampleRate);
+      const left = buffer.getChannelData(0);
+      const right = buffer.getChannelData(1);
 
-      // Same DSP math as v2, run once instead of forever.
-      let lastOut = 0;
-      const b = [0, 0, 0, 0, 0, 0, 0];
-      let rainDropTimer = 0;
+      // Decorrelated DSP filters for immersive 3D spatial separation
+      let lastL = 0, lastR = 0;
+      const bL = [0, 0, 0, 0, 0, 0, 0];
+      const bR = [0, 0, 0, 0, 0, 0, 0];
+      let rainTimerL = 0, rainTimerR = 0;
 
       for (let i = 0; i < length; i++) {
-        const white = Math.random() * 2 - 1;
-        let sample = 0;
+        const whiteL = Math.random() * 2 - 1;
+        const whiteR = Math.random() * 2 - 1;
+        let sL = 0, sR = 0;
 
-        if (mode === 1) { // Brown
-          sample = (lastOut + (0.02 * white)) / 1.02;
-          lastOut = sample;
-          sample *= 3.5;
-        } else if (mode === 2 || mode === 4 || mode === 5) { // Pink-based
-          b[0] = 0.99886 * b[0] + white * 0.0555179;
-          b[1] = 0.99332 * b[1] + white * 0.0750759;
-          b[2] = 0.96900 * b[2] + white * 0.1538520;
-          b[3] = 0.86650 * b[3] + white * 0.3104856;
-          b[4] = 0.55000 * b[4] + white * 0.5329522;
-          b[5] = -0.7616 * b[5] - white * 0.0168980;
-          sample = b[0] + b[1] + b[2] + b[3] + b[4] + b[5] + b[6] + white * 0.5362;
-          sample *= 0.11;
-          b[6] = white * 0.115926;
+        if (mode === 1) { // Deep Brown Cabin Noise (ADHD Calming Shield)
+          sL = (lastL + (0.015 * whiteL)) / 1.015;
+          sR = (lastR + (0.015 * whiteR)) / 1.015;
+          lastL = sL;
+          lastR = sR;
+          sL *= 3.8;
+          sR *= 3.8;
+        } else if (mode === 2 || mode === 4 || mode === 5) { // Binaural Pink / Rain / Heavy Atmosphere
+          // Paul Kellet 7-pole filter bank with decorrelated L/R channels
+          bL[0] = 0.99886 * bL[0] + whiteL * 0.0555179;
+          bL[1] = 0.99332 * bL[1] + whiteL * 0.0750759;
+          bL[2] = 0.96900 * bL[2] + whiteL * 0.1538520;
+          bL[3] = 0.86650 * bL[3] + whiteL * 0.3104856;
+          bL[4] = 0.55000 * bL[4] + whiteL * 0.5329522;
+          bL[5] = -0.7616 * bL[5] - whiteL * 0.0168980;
+          sL = (bL[0] + bL[1] + bL[2] + bL[3] + bL[4] + bL[5] + bL[6] + whiteL * 0.5362) * 0.12;
+          bL[6] = whiteL * 0.115926;
 
-          if (mode >= 4) { // Rain
-            let rainSample = sample * 0.4;
-            rainDropTimer--;
-            const dropThreshold = mode === 4 ? 4000 : 1200;
-            if (Math.random() * dropThreshold < 1) {
-              rainDropTimer = mode === 4 ? 100 : 250;
-            }
-            if (rainDropTimer > 0) {
-              rainSample += white * 0.15 * (rainDropTimer / 250);
-            }
-            sample = rainSample * (mode === 5 ? 1.6 : 1.2);
+          bR[0] = 0.99886 * bR[0] + whiteR * 0.0555179;
+          bR[1] = 0.99332 * bR[1] + whiteR * 0.0750759;
+          bR[2] = 0.96900 * bR[2] + whiteR * 0.1538520;
+          bR[3] = 0.86650 * bR[3] + whiteR * 0.3104856;
+          bR[4] = 0.55000 * bR[4] + whiteR * 0.5329522;
+          bR[5] = -0.7616 * bR[5] - whiteR * 0.0168980;
+          sR = (bR[0] + bR[1] + bR[2] + bR[3] + bR[4] + bR[5] + bR[6] + whiteR * 0.5362) * 0.12;
+          bR[6] = whiteR * 0.115926;
+
+          if (mode >= 4) { // Stereo Organic Rain & Atmospheric Rumble
+            let rainL = sL * 0.45;
+            let rainR = sR * 0.45;
+            rainTimerL--;
+            rainTimerR--;
+            const dropThresh = mode === 4 ? 3200 : 1100;
+            if (Math.random() * dropThresh < 1) rainTimerL = mode === 4 ? 120 : 280;
+            if (Math.random() * dropThresh < 1) rainTimerR = mode === 4 ? 120 : 280;
+
+            if (rainTimerL > 0) rainL += whiteL * 0.18 * (rainTimerL / 280);
+            if (rainTimerR > 0) rainR += whiteR * 0.18 * (rainTimerR / 280);
+
+            // Add deep warm low-end rumble for heavy rain (mode 5)
+            sL = rainL * (mode === 5 ? 1.75 : 1.25);
+            sR = rainR * (mode === 5 ? 1.75 : 1.25);
           }
-        } else if (mode === 3) { // White
-          sample = white * 0.15;
+        } else if (mode === 3) { // Softened Silky White Air
+          sL = whiteL * 0.14;
+          sR = whiteR * 0.14;
         }
-        data[i] = sample;
+        left[i] = sL;
+        right[i] = sR;
       }
 
-      // Short crossfade at the loop seam to avoid a click.
-      const fade = Math.floor(ctx.sampleRate * 0.05);
-      for (let i = 0; i < fade; i++) {
-        const k = i / fade;
-        data[i] = data[i] * k + data[length - fade + i] * (1 - k);
+      // 200ms seamless equal-power cosine crossfade at loop boundary
+      const fade = Math.floor(ctx.sampleRate * 0.2);
+      for (let ch = 0; ch < 2; ch++) {
+        const data = buffer.getChannelData(ch);
+        for (let i = 0; i < fade; i++) {
+          const k = i / fade;
+          const gainStart = Math.cos(k * 0.5 * Math.PI);
+          const gainEnd = Math.sin(k * 0.5 * Math.PI);
+          data[i] = data[i] * gainStart + data[length - fade + i] * gainEnd;
+        }
       }
 
       this.cache.set(mode, buffer);
@@ -255,6 +380,8 @@
       this.noiseSource = null;
       this.noiseGain = null;
       this.noiseMode = 0;
+      this.noiseVolume = 0.35;
+      this.voiceIdx = 0;
       this.voiceAudio = null;
       this.playbackRate = 1.0;
     }
@@ -267,11 +394,23 @@
       return this.ctx;
     }
 
-    setNoiseMode(mode) {
+    setVoiceIdx(idx) {
+      this.voiceIdx = idx;
+    }
+
+    setNoiseVolume(val) {
+      this.noiseVolume = val;
+      if (this.noiseGain && this.ctx) {
+        this.noiseGain.gain.setTargetAtTime(val, this.ctx.currentTime, 0.04);
+      }
+    }
+
+    setNoiseMode(mode, volume = 0.35) {
       this.noiseMode = mode;
+      this.noiseVolume = volume;
       if (this.noiseSource) {
-        this.noiseSource.stop();
-        this.noiseSource.disconnect();
+        try { this.noiseSource.stop(); } catch {}
+        try { this.noiseSource.disconnect(); } catch {}
         this.noiseSource = null;
       }
       if (mode === 0) return;
@@ -279,9 +418,10 @@
       const ctx = this.ensureCtx();
       if (!this.noiseGain) {
         this.noiseGain = ctx.createGain();
-        this.noiseGain.gain.value = 0.3;
         this.noiseGain.connect(ctx.destination);
       }
+      this.noiseGain.gain.setValueAtTime(this.noiseVolume, ctx.currentTime);
+
       this.noiseSource = ctx.createBufferSource();
       this.noiseSource.buffer = Soundscapes.getBuffer(ctx, mode);
       this.noiseSource.loop = true;
@@ -290,17 +430,25 @@
     }
 
     async fetchTTS(text, retries = 1) {
+      if (!text || typeof text !== 'string' || !text.trim()) {
+        throw terminalError("Text chunk is empty or invalid.");
+      }
       try {
         const token = await Utils.getToken();
         if (!token) throw terminalError("Not logged in — open the extension popup to add your token.");
 
-        const res = await fetch(`${API_BASE}/api/extension-tts`, {
+        const activeVoice = THEME.voices[this.voiceIdx || 0];
+        const res = await fetch(`${TTS_BASE}/api/extension/tts`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({ text })
+          body: JSON.stringify({
+            text: text.trim(),
+            voice: activeVoice ? activeVoice.id : undefined,
+            voiceId: activeVoice ? activeVoice.elevenId : undefined
+          })
         });
 
         if (res.status === 429 && retries > 0) {
@@ -316,30 +464,87 @@
         if (!res.ok) {
           let errMsg = `API Error ${res.status}`;
           try { const data = await res.json(); if (data.message) errMsg = data.message; } catch { /* not json */ }
-          throw new Error(errMsg);
+          throw terminalError(`TTS Error (${res.status}): ${errMsg}`);
         }
 
         const blob = await res.blob();
         return URL.createObjectURL(blob);
       } catch (err) {
         if (retries > 0 && !err.terminal) {
-          await new Promise(r => setTimeout(r, 2000));
+          const isNetworkErr = err instanceof TypeError;
+          await new Promise(r => setTimeout(r, isNetworkErr ? 3000 : 1500));
           return this.fetchTTS(text, retries - 1);
+        }
+        if (err instanceof TypeError) {
+          console.warn("[FocusReader] Network/Server offline — switching to high-speed WebSpeech neural engine.");
+          return "webspeech_fallback";
         }
         throw err;
       }
     }
 
+    playWebSpeech(text, tokens, onBoundary, onEnd) {
+      this.stopVoice();
+      if (!window.speechSynthesis) {
+        if (onEnd) onEnd();
+        return;
+      }
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = this.playbackRate;
+      const voices = window.speechSynthesis.getVoices();
+      const activeName = THEME.voices[this.voiceIdx || 0]?.name || "";
+      const isMale = activeName.toLowerCase().includes("male") || activeName.includes("Alex") || activeName.includes("Daniel") || activeName.includes("Evan") || activeName.includes("Standard");
+      const matchedVoice = voices.find(v => v.lang.startsWith("en") && (isMale ? v.name.toLowerCase().includes("male") || v.name.includes("Alex") || v.name.includes("Daniel") : v.name.toLowerCase().includes("female") || v.name.includes("Samantha"))) || voices.find(v => v.lang.startsWith("en")) || voices[0];
+      if (matchedVoice) utterance.voice = matchedVoice;
+
+      utterance.onboundary = (event) => {
+        if (event.name === 'word' && onBoundary) {
+          onBoundary(event.charIndex);
+        }
+      };
+      utterance.onend = () => {
+        if (onEnd) onEnd();
+      };
+      utterance.onerror = () => {
+        if (onEnd) onEnd();
+      };
+      this.activeUtterance = utterance;
+      window.speechSynthesis.speak(utterance);
+    }
+
     playVoice(url, onPlay, onEnd) {
       this.stopVoice();
       this.voiceAudio = new Audio(url);
+      this.voiceAudio.defaultPlaybackRate = this.playbackRate;
       this.voiceAudio.playbackRate = this.playbackRate;
-      this.voiceAudio.onplay = onPlay;
+
+      const triggerPlayCallback = () => {
+        if (this.voiceAudio) {
+          this.voiceAudio.defaultPlaybackRate = this.playbackRate;
+          this.voiceAudio.playbackRate = this.playbackRate;
+        }
+        if (onPlay) onPlay();
+      };
+
+      this.voiceAudio.onplay = triggerPlayCallback;
       this.voiceAudio.onended = () => {
         URL.revokeObjectURL(url);
         if (onEnd) onEnd();
       };
-      this.voiceAudio.play().catch(e => console.error("[FocusReader] playback error:", e));
+      this.voiceAudio.play().catch(e => {
+        console.error("[FocusReader] playback error:", e);
+        if (this.voiceAudio && this.voiceAudio.readyState >= 2) {
+          triggerPlayCallback();
+        } else if (this.voiceAudio) {
+          this.voiceAudio.oncanplaythrough = () => {
+            this.voiceAudio.defaultPlaybackRate = this.playbackRate;
+            this.voiceAudio.playbackRate = this.playbackRate;
+            this.voiceAudio.play().catch(() => {});
+            triggerPlayCallback();
+          };
+        }
+      });
     }
 
     stopVoice() {
@@ -348,21 +553,37 @@
         this.voiceAudio.src = '';
         this.voiceAudio = null;
       }
+      if (window.speechSynthesis && this.activeUtterance) {
+        window.speechSynthesis.cancel();
+        this.activeUtterance = null;
+      }
     }
 
     pause() {
       if (this.voiceAudio) this.voiceAudio.pause();
+      if (window.speechSynthesis && window.speechSynthesis.speaking) window.speechSynthesis.pause();
       if (this.ctx?.state === 'running') this.ctx.suspend();
     }
 
     resume() {
-      if (this.voiceAudio) this.voiceAudio.play();
+      if (this.voiceAudio) {
+        this.voiceAudio.defaultPlaybackRate = this.playbackRate;
+        this.voiceAudio.playbackRate = this.playbackRate;
+        this.voiceAudio.play();
+      }
+      if (window.speechSynthesis && window.speechSynthesis.paused) window.speechSynthesis.resume();
       if (this.ctx?.state === 'suspended') this.ctx.resume();
     }
 
     setSpeed(speed) {
       this.playbackRate = speed;
-      if (this.voiceAudio) this.voiceAudio.playbackRate = speed;
+      if (this.voiceAudio) {
+        this.voiceAudio.defaultPlaybackRate = speed;
+        this.voiceAudio.playbackRate = speed;
+      }
+      if (this.activeUtterance && window.speechSynthesis) {
+        this.activeUtterance.rate = speed;
+      }
     }
 
     destroy() {
@@ -433,11 +654,22 @@
         }
 
         .word {
+          display: inline-block;
           color: var(--inactive-text);
-          transition: color 0.1s ease, text-shadow 0.1s ease;
-          padding: 0 2px;
-          border-radius: 4px;
+          transition: color 0.12s ease, transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1), text-shadow 0.12s ease, background-color 0.12s ease;
+          padding: 1px 4px;
+          margin: 0 1px;
+          border-radius: 6px;
           cursor: pointer;
+        }
+        .word:hover {
+          background-color: rgba(255, 255, 255, 0.08);
+        }
+        .word.active {
+          transform: scale(1.08);
+          color: var(--active-color, #fff);
+          text-shadow: 0 0 18px var(--active-shadow, rgba(255,255,255,0.6));
+          background-color: var(--active-bg, rgba(255,255,255,0.14));
         }
 
         .controls-wrapper {
@@ -493,6 +725,53 @@
 
         button.primary { background: rgba(255,255,255,0.95); color: #000; }
         button.primary:hover { transform: scale(1.05); background: #fff; }
+
+        .noise-vol-container {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 0 12px;
+          background: rgba(255, 255, 255, 0.06);
+          border-radius: 20px;
+          height: 42px;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .noise-vol-container.hidden {
+          display: none;
+        }
+        .noise-vol-label {
+          font-size: 12px;
+          font-weight: 700;
+          color: #a1a1aa;
+          min-width: 36px;
+          text-align: right;
+        }
+        input[type="range"] {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 76px;
+          height: 6px;
+          background: rgba(255, 255, 255, 0.2);
+          border-radius: 4px;
+          outline: none;
+          cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          background: #d8b4fe;
+          border: 2px solid #ffffff;
+          box-shadow: 0 0 10px rgba(168, 85, 247, 0.8);
+          cursor: pointer;
+          transition: transform 0.15s ease, background 0.15s ease;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+          transform: scale(1.25);
+          background: #c084fc;
+        }
 
         .toast-container {
           position: fixed;
@@ -589,126 +868,20 @@
   }
 
   // ==========================================
-  // BRAIN COMMANDER — voice control
-  // ==========================================
-  class BrainCommander {
-    constructor(ui, audioEngine, controller) {
-      this.ui = ui;
-      this.audioEngine = audioEngine;
-      this.controller = controller;
-      this.recognition = null;
-      this.isListening = false;
-      this.btn = null;
-      this.currentScrollDir = 0;
-      this.initSpeech();
-    }
-
-    initSpeech() {
-      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRec) return;
-
-      this.recognition = new SpeechRec();
-      this.recognition.continuous = true;
-      this.recognition.interimResults = true;
-      this.recognition.lang = 'en-US';
-
-      this.recognition.onstart = () => {
-        this.isListening = true;
-        this.btn.innerHTML = `${ICONS.sparkles} Brain (Listening...)`;
-        this.btn.style.color = '#4ade80';
-        this.scrollLoop();
-      };
-
-      this.recognition.onend = () => {
-        this.isListening = false;
-        this.currentScrollDir = 0;
-        this.btn.innerHTML = `${ICONS.sparkles} Brain (Mic Off)`;
-        this.btn.style.color = '#fff';
-      };
-
-      this.recognition.onresult = (event) => {
-        let interimTranscript = '';
-        let finalTranscript = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript.toLowerCase().trim();
-          else interimTranscript += event.results[i][0].transcript.toLowerCase().trim();
-        }
-
-        const activeText = finalTranscript || interimTranscript;
-        if (activeText.includes('down')) this.currentScrollDir = 1;
-        else if (activeText.includes('up')) this.currentScrollDir = -1;
-        else this.currentScrollDir = 0;
-
-        if (finalTranscript) this.handleCommand(finalTranscript);
-      };
-    }
-
-    scrollLoop() {
-      if (this.currentScrollDir !== 0) {
-        this.ui.vault.scrollBy({ top: this.currentScrollDir * 15, behavior: 'instant' });
-      }
-      if (this.isListening) requestAnimationFrame(() => this.scrollLoop());
-    }
-
-    async handleCommand(cmd) {
-      if (cmd.includes('refresh')) window.location.reload();
-      else if (cmd.includes('back')) window.history.back();
-      else if (cmd.startsWith('go to ')) {
-        const target = cmd.replace('go to ', '').trim().replace(/\s+/g, '');
-        if (target) window.location.href = `https://${target}.com`;
-      }
-      else if (cmd.includes('pause') || cmd.includes('stop')) this.controller.pauseSystem();
-      else if (cmd.includes('play') || cmd.includes('turn on voice')) this.controller.resumeSystem();
-
-      const noteMatch = cmd.match(/^(?:create|take|save|write|send)\s+(?:a\s+)?(?:note|thought|memo)\s*(?:about|that)?\s*(.*)$/i);
-      if (noteMatch) {
-        const noteContent = noteMatch[1].trim() || "Empty note";
-        this.ui.showToast("Sending note to dashboard...");
-        try {
-          const token = await Utils.getToken();
-          const res = await fetch(`${API_BASE}/api/extension-notes`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ note: noteContent, source: window.location.href })
-          });
-          if (res.ok) this.ui.showToast("Note successfully saved! 📝");
-          else this.ui.showToast("Could not save the note.", true);
-        } catch {
-          this.ui.showToast("Error saving note.", true);
-        }
-      }
-    }
-
-    attachButton(btn) {
-      this.btn = btn;
-      if (!this.recognition) {
-        this.btn.innerHTML = "Brain Not Supported";
-        this.btn.disabled = true;
-        return;
-      }
-      this.btn.onclick = () => {
-        if (this.isListening) this.recognition.stop();
-        else this.recognition.start();
-      };
-    }
-
-    stop() {
-      if (this.recognition && this.isListening) this.recognition.stop();
-    }
-  }
-
-  // ==========================================
   // CONTROLLER — session orchestration
   // ==========================================
   class FocusReaderController {
-    constructor(chunks, prefs, onExit) {
-      this.chunks = chunks;
-      this.chunkTokens = chunks.map(c => Utils.buildWordTimings(c));
+    constructor(articleData, prefs, onExit, prefetchPromise = null) {
+      this.articleData = articleData;
+      this.chunks = articleData.chunks;
+      this.paragraphs = articleData.paragraphs;
+      this.chunkWordRanges = articleData.chunkWordRanges;
+      this.chunkTokens = this.chunks.map(c => Utils.buildWordTimings(c));
       this.onExit = onExit;
+      this.prefetchPromise = prefetchPromise;
 
       this.ui = new ShadowUI();
       this.audio = new AudioEngine();
-      this.brain = new BrainCommander(this.ui, this.audio, this);
 
       this.currentChunkIdx = 0;
       this.isPaused = false;
@@ -720,25 +893,55 @@
 
       this.config = { ...prefs };
 
-      this.activeSpans = [];
+      this.allSpans = [];
       this.activeWordSpan = null;
       this.animationFrameId = null;
+      this._lastScroll = 0;
 
       this.setupUI();
       this.applyPrefs();
       this.ui.show();
       this.bindKeys();
       this.fillBuffer();
+
+      // Automatically log/save visit to Reading Library
+      Utils.recordVisit({
+        id: window.location.href,
+        title: document.title || window.location.hostname,
+        url: window.location.href,
+        domain: window.location.hostname,
+        wordCount: this.paragraphs ? this.paragraphs.join(' ').split(/\s+/).length : 0,
+        date: new Date().toISOString(),
+        isFavorite: false
+      });
     }
 
     setupUI() {
-      this.renderCurrentChunk();
+      this.renderAllParagraphs();
 
       this.btnSpeed = this.ui.addControlButton(ICONS.lightning, `${THEME.speeds[this.config.speedIdx].toFixed(2)}x`);
       this.btnSpeed.onclick = () => {
         this.config.speedIdx = (this.config.speedIdx + 1) % THEME.speeds.length;
         this.applySpeed();
         this.persist();
+      };
+
+      this.btnVoice = this.ui.addControlButton(ICONS.voice, THEME.voices[this.config.voiceIdx || 0].name);
+      this.btnVoice.onclick = () => {
+        this.config.voiceIdx = ((this.config.voiceIdx || 0) + 1) % THEME.voices.length;
+        this.applyVoice();
+        this.persist();
+
+        if (this.isPlaying) {
+          this.audioQueue.forEach(i => URL.revokeObjectURL(i.url));
+          this.audioQueue = [];
+          this.audio.stopVoice();
+          this.stopKaraoke();
+          this.isPlaying = false;
+          this.nextFetchIdx = this.currentChunkIdx;
+          this.inflightFetches = 0;
+          this.fillBuffer();
+        }
       };
 
       this.btnColor = this.ui.addControlButton(ICONS.palette, "Color");
@@ -748,7 +951,7 @@
         this.persist();
       };
 
-      this.btnBionic = this.ui.addControlButton(ICONS.brain, "ADHD");
+      this.btnBionic = this.ui.addControlButton(ICONS.adhd, "ADHD Mode");
       this.btnBionic.onclick = () => {
         this.config.isBionic = !this.config.isBionic;
         this.applyBionic();
@@ -762,11 +965,56 @@
         this.persist();
       };
 
-      const btnBrain = this.ui.addControlButton(ICONS.sparkles, "Brain (Mic Off)");
-      this.brain.attachButton(btnBrain);
+      // Customizable Soundscape Volume Slider
+      this.noiseVolContainer = document.createElement('div');
+      this.noiseVolContainer.className = 'noise-vol-container';
+      this.noiseVolContainer.title = "Background Sound Volume";
+
+      const volIcon = document.createElement('span');
+      volIcon.className = 'noise-vol-icon';
+      volIcon.innerHTML = '🔊';
+      volIcon.style.fontSize = '14px';
+
+      this.noiseVolSlider = document.createElement('input');
+      this.noiseVolSlider.type = 'range';
+      this.noiseVolSlider.min = '0';
+      this.noiseVolSlider.max = '1';
+      this.noiseVolSlider.step = '0.02';
+      this.noiseVolSlider.value = (this.config.noiseVolume !== undefined ? this.config.noiseVolume : 0.35).toString();
+      this.noiseVolSlider.title = "Background Sound Volume";
+
+      const volLabel = document.createElement('span');
+      volLabel.className = 'noise-vol-label';
+      volLabel.textContent = `${Math.round(this.noiseVolSlider.value * 100)}%`;
+
+      this.noiseVolSlider.oninput = (e) => {
+        const val = parseFloat(e.target.value);
+        this.config.noiseVolume = val;
+        volLabel.textContent = `${Math.round(val * 100)}%`;
+        this.audio.setNoiseVolume(val);
+      };
+      this.noiseVolSlider.onchange = () => {
+        this.persist();
+      };
+
+      this.noiseVolContainer.appendChild(volIcon);
+      this.noiseVolContainer.appendChild(this.noiseVolSlider);
+      this.noiseVolContainer.appendChild(volLabel);
+      this.ui.controls.appendChild(this.noiseVolContainer);
 
       this.btnPause = this.ui.addControlButton(ICONS.pause, "Pause");
       this.btnPause.onclick = () => (this.isPaused ? this.resumeSystem() : this.pauseSystem());
+
+      this.btnFav = this.ui.addControlButton("☆", "Favorite");
+      this.btnFav.onclick = () => {
+        Utils.toggleFavorite(window.location.href, (isFav) => {
+          this.btnFav.innerHTML = isFav ? `★ <span style="color: #fbbf24;">Favorited</span>` : `☆ <span>Favorite</span>`;
+          this.ui.showToast(isFav ? "Saved to your reading favorites!" : "Removed from favorites");
+        });
+      };
+
+      const btnLib = this.ui.addControlButton("📚", "Library");
+      btnLib.onclick = () => window.open(chrome.runtime.getURL('library.html'), '_blank');
 
       const btnDash = this.ui.addControlButton(ICONS.home, "Dashboard");
       btnDash.onclick = () => window.open(DASHBOARD_URL, '_blank');
@@ -778,21 +1026,31 @@
     // Preference application (also used to restore persisted prefs on boot)
     applyPrefs() {
       this.applySpeed();
+      this.applyVoice();
       this.applyColor();
       this.applyBionic();
       this.applyNoise();
     }
     applySpeed() {
       const spd = THEME.speeds[this.config.speedIdx];
-      this.btnSpeed.innerHTML = `${ICONS.lightning} ${spd.toFixed(2)}x`;
+      this.btnSpeed.innerHTML = `${ICONS.lightning} <span>${spd.toFixed(2)}x</span>`;
       this.audio.setSpeed(spd);
     }
+    applyVoice() {
+      const voice = THEME.voices[this.config.voiceIdx || 0];
+      this.btnVoice.innerHTML = `${ICONS.voice} <span>${voice.name}</span>`;
+      this.audio.setVoiceIdx(this.config.voiceIdx || 0);
+    }
     applyColor() {
-      const color = THEME.colors[this.config.colorIdx];
-      this.btnColor.style.color = color.solid;
+      const color = THEME.colors[this.config.colorIdx || 0];
+      if (this.btnColor) this.btnColor.style.color = color.solid;
+      if (this.ui?.content) {
+        this.ui.content.style.setProperty('--active-color', color.solid);
+        this.ui.content.style.setProperty('--active-shadow', color.val);
+      }
       if (this.activeWordSpan) {
         this.activeWordSpan.style.color = color.solid;
-        this.activeWordSpan.style.textShadow = `0 0 15px ${color.val}`;
+        this.activeWordSpan.style.textShadow = `0 0 18px ${color.val}`;
       }
     }
     applyBionic() {
@@ -800,8 +1058,18 @@
       this.refreshSpanContent();
     }
     applyNoise() {
-      this.btnNoise.innerHTML = `${ICONS.waves} ${THEME.soundscapes[this.config.noiseIdx]}`;
-      this.audio.setNoiseMode(this.config.noiseIdx);
+      this.btnNoise.innerHTML = `${ICONS.waves} <span>${THEME.soundscapes[this.config.noiseIdx]}</span>`;
+      const mode = this.config.noiseIdx;
+      const volume = this.config.noiseVolume !== undefined ? this.config.noiseVolume : 0.35;
+      if (mode === 0) {
+        this.noiseVolContainer.classList.add('hidden');
+      } else {
+        this.noiseVolContainer.classList.remove('hidden');
+        this.noiseVolSlider.value = volume.toString();
+        const label = this.noiseVolContainer.querySelector('.noise-vol-label');
+        if (label) label.textContent = `${Math.round(volume * 100)}%`;
+      }
+      this.audio.setNoiseMode(mode, volume);
     }
     persist() {
       Utils.savePrefs(this.config);
@@ -819,61 +1087,130 @@
       document.addEventListener('keydown', this.keyHandler, true);
     }
 
-    // --- DOM virtualization: only the current chunk lives in the DOM ------
-    renderCurrentChunk() {
+    // --- DOM virtualization: high-performance batch innerHTML + Event Delegation ------
+    renderAllParagraphs() {
       this.ui.content.textContent = '';
-      this.activeSpans = [];
+      this.allSpans = [];
       this.activeWordSpan = null;
 
-      const { words } = this.chunkTokens[this.currentChunkIdx];
-      const pEl = document.createElement('p');
-      pEl.style.marginBottom = '2rem';
-      const frag = document.createDocumentFragment();
+      let globalWordCounter = 0;
+      const isBionic = this.config.isBionic;
+      const htmlChunks = [];
+      const pCount = this.paragraphs.length;
 
-      words.forEach((word, wordIdx) => {
-        const span = document.createElement('span');
-        span.className = 'word';
-        span.dataset.rawWord = word;
-        span.dataset.bionicHtml = Utils.bionicFormat(word);
-        span.innerHTML = this.config.isBionic ? span.dataset.bionicHtml : word;
-        span.onclick = () => this.seekToWord(wordIdx);
-        frag.appendChild(span);
-        frag.appendChild(document.createTextNode(' '));
-        this.activeSpans.push(span);
-      });
+      for (let pIdx = 0; pIdx < pCount; pIdx++) {
+        const words = this.paragraphs[pIdx].split(/\s+/).filter(Boolean);
+        if (words.length === 0) continue;
 
-      pEl.appendChild(frag);
-      this.ui.content.appendChild(pEl);
+        let pHtml = '<p style="margin-bottom: 2.2rem; line-height: 1.85;">';
+        const wCount = words.length;
+        for (let wIdx = 0; wIdx < wCount; wIdx++) {
+          const word = words[wIdx];
+          const bionic = Utils.bionicFormat(word);
+          const idx = globalWordCounter++;
+          const displayHtml = isBionic ? bionic : word;
+          pHtml += `<span class="word" data-idx="${idx}" data-raw="${Utils.escapeAttr(word)}" data-bionic="${Utils.escapeAttr(bionic)}">${displayHtml}</span> `;
+        }
+        pHtml += '</p>';
+        htmlChunks.push(pHtml);
+      }
+
+      // Batch inserting via innerHTML is up to 30x faster than thousands of createElement & appendChild calls!
+      this.ui.content.innerHTML = htmlChunks.join('');
+      this.allSpans = Array.from(this.ui.content.getElementsByClassName('word'));
+
+      // Apply current active color variables immediately
+      const color = THEME.colors[this.config.colorIdx || 0];
+      this.ui.content.style.setProperty('--active-color', color.solid);
+      this.ui.content.style.setProperty('--active-shadow', color.val);
+
+      // Event delegation: ONE single click listener for all words instead of thousands of closures
+      if (!this._hasWordClickListener) {
+        this._hasWordClickListener = true;
+        this.ui.content.addEventListener('click', (e) => {
+          const span = e.target.closest('.word');
+          if (span && span.dataset.idx !== undefined) {
+            this.seekToGlobalWord(parseInt(span.dataset.idx, 10));
+          }
+        });
+      }
     }
 
     refreshSpanContent() {
-      this.activeSpans.forEach(span => {
-        span.innerHTML = this.config.isBionic ? span.dataset.bionicHtml : span.dataset.rawWord;
-      });
+      const isBionic = this.config.isBionic;
+      const len = this.allSpans.length;
+      for (let i = 0; i < len; i++) {
+        const span = this.allSpans[i];
+        if (!span) continue;
+        const val = isBionic ? span.dataset.bionic : span.dataset.raw;
+        if (span.innerHTML !== val) span.innerHTML = val;
+      }
     }
 
-    /** Click-to-seek within the currently playing chunk's audio. */
-    seekToWord(wordIdx) {
+    /** Click-to-seek within any word across the entire document. */
+    seekToGlobalWord(globalIdx) {
+      let targetChunkIdx = 0;
+      for (let i = 0; i < this.chunkWordRanges.length; i++) {
+        if (globalIdx >= this.chunkWordRanges[i].startIdx && globalIdx <= this.chunkWordRanges[i].endIdx) {
+          targetChunkIdx = i;
+          break;
+        }
+      }
+
+      const range = this.chunkWordRanges[targetChunkIdx];
+      const localWordIdx = globalIdx - range.startIdx;
+      const tokens = this.chunkTokens[targetChunkIdx]?.tokens || [];
       const audio = this.audio.voiceAudio;
-      const tokens = this.chunkTokens[this.currentChunkIdx].tokens;
-      if (!audio || !audio.duration || !tokens[wordIdx]) return;
-      audio.currentTime = tokens[wordIdx].startFrac * audio.duration;
-      this.highlightWordAt(tokens, audio.currentTime / audio.duration);
+
+      if (targetChunkIdx === this.currentChunkIdx && audio && audio.duration && tokens[localWordIdx]) {
+        audio.currentTime = tokens[localWordIdx].startFrac * audio.duration;
+        this.highlightWordAt(tokens, audio.currentTime / audio.duration);
+        if (this.isPaused) this.resumeSystem();
+        return;
+      }
+
+      // Seeking into a different chunk
+      this.audioQueue.forEach(i => URL.revokeObjectURL(i.url));
+      this.audioQueue = [];
+      this.audio.stopVoice();
+      this.stopKaraoke();
+      this.isPlaying = false;
+      this.currentChunkIdx = targetChunkIdx;
+      this.nextFetchIdx = targetChunkIdx;
+      this.inflightFetches = 0;
+
+      // Pre-highlight the sought word while audio buffers
+      if (this.activeWordSpan) {
+        this.activeWordSpan.classList.remove('active');
+        this.activeWordSpan.style.color = '';
+        this.activeWordSpan.style.textShadow = '';
+      }
+      const targetSpan = this.allSpans[globalIdx];
+      if (targetSpan) {
+        targetSpan.classList.add('active');
+        this.activeWordSpan = targetSpan;
+      }
+
+      this.fillBuffer();
       if (this.isPaused) this.resumeSystem();
     }
 
-    // --- Audio queue: keep up to 2 chunks buffered ahead -------------------
+    // --- Audio queue: keep up to 6 chunks buffered ahead (`120+ seconds`) for uninterrupted playback ---
     fillBuffer() {
       while (
         this.isQueueActive &&
-        this.audioQueue.length + this.inflightFetches < 2 &&
-        this.nextFetchIdx < this.chunks.length
+        this.audioQueue.length + this.inflightFetches < 6 &&
+        this.nextFetchIdx < this.chunks.length &&
+        this.inflightFetches < 3
       ) {
         const fetchIdx = this.nextFetchIdx++;
         this.inflightFetches++;
-        this.audio.fetchTTS(this.chunks[fetchIdx])
+        const fetchReq = (fetchIdx === 0 && this.prefetchPromise)
+          ? this.prefetchPromise.then(url => { this.prefetchPromise = null; return url || this.audio.fetchTTS(this.chunks[fetchIdx]); })
+          : this.audio.fetchTTS(this.chunks[fetchIdx]);
+        fetchReq
           .then(url => {
-            if (!this.isQueueActive) { URL.revokeObjectURL(url); return; }
+            if (!this.isQueueActive) { if (url) URL.revokeObjectURL(url); return; }
             this.audioQueue.push({ url, chunkIdx: fetchIdx });
             this.audioQueue.sort((a, b) => a.chunkIdx - b.chunkIdx);
             if (!this.isPlaying && !this.isPaused) this.playNextInQueue();
@@ -881,15 +1218,14 @@
           .catch(err => {
             console.error("[FocusReader] TTS fetch failed:", err);
             if (err.terminal) {
-              // Out of credits / bad token: stop the queue entirely — one
-              // clear message, zero request storms. Queued audio finishes.
               this.isQueueActive = false;
               const action = err.action === "billing"
                 ? () => window.open(`${API_BASE}/dashboard/billing`, '_blank')
                 : () => window.open(`${DASHBOARD_URL}/tools`, '_blank');
               this.ui.showToast(err.message, true, action);
             } else {
-              this.ui.showToast(`TTS Error: ${err.message}`, true);
+              // Non-terminal failure: allow remaining queue and future fetches to continue without killing playback
+              this.ui.showToast(`TTS Notice: ${err.message || "Chunk delayed"}`, false);
             }
           })
           .finally(() => {
@@ -907,13 +1243,41 @@
 
       this.isPlaying = true;
       const { url, chunkIdx } = this.audioQueue.shift();
+      this.currentChunkIdx = chunkIdx;
 
-      if (chunkIdx !== this.currentChunkIdx || this.activeSpans.length === 0) {
-        this.currentChunkIdx = chunkIdx;
-        this.renderCurrentChunk();
+      const currentTokens = this.chunkTokens[chunkIdx]?.tokens || [];
+      if (url === "webspeech_fallback") {
+        this.ui.showToast("Server offline — using instant Offline Neural Voice Engine", false);
+        const chunkText = this.chunks[chunkIdx];
+        this.audio.playWebSpeech(
+          chunkText,
+          currentTokens,
+          (charIdx) => {
+            const matchedToken = currentTokens.find(t => charIdx >= t.charStart && charIdx < t.charEnd) || currentTokens[0];
+            if (matchedToken) {
+              const globalIdx = this.chunkWordRanges[chunkIdx].startIdx + currentTokens.indexOf(matchedToken);
+              const targetSpan = this.allSpans[globalIdx];
+              if (targetSpan && targetSpan !== this.activeWordSpan) {
+                if (this.activeWordSpan) {
+                  this.activeWordSpan.classList.remove('active');
+                  this.activeWordSpan.style.color = '';
+                  this.activeWordSpan.style.textShadow = '';
+                }
+                targetSpan.classList.add('active');
+                this.activeWordSpan = targetSpan;
+                this.applyColor();
+              }
+            }
+          },
+          () => {
+            this.stopKaraoke();
+            this.playNextInQueue();
+          }
+        );
+        this.fillBuffer();
+        return;
       }
 
-      const currentTokens = this.chunkTokens[chunkIdx].tokens;
       this.audio.playVoice(
         url,
         () => {
@@ -932,11 +1296,19 @@
       this.stopKaraoke();
       const step = () => {
         const audio = this.audio.voiceAudio;
-        if (!audio || audio.paused || !audio.duration) {
+        if (!audio || audio.paused || audio.ended) {
           this.animationFrameId = null;
           return;
         }
-        this.highlightWordAt(tokens, audio.currentTime / audio.duration);
+        let duration = audio.duration;
+        if (!duration || isNaN(duration) || !isFinite(duration) || duration <= 0) {
+          // Estimate duration dynamically based on word count (~380ms per word at 1.0x speed)
+          duration = Math.max(1.5, ((tokens?.length || 10) * 0.38) / (this.playbackRate || 1));
+        }
+        const frac = Math.min(1, Math.max(0, audio.currentTime / duration));
+        if (tokens && tokens.length > 0) {
+          this.highlightWordAt(tokens, frac);
+        }
         this.animationFrameId = requestAnimationFrame(step);
       };
       this.animationFrameId = requestAnimationFrame(step);
@@ -948,22 +1320,28 @@
     }
 
     highlightWordAt(tokens, frac) {
-      const activeIdx = Utils.wordIndexAt(tokens, frac);
-      const nextSpan = this.activeSpans[activeIdx];
+      const localIdx = Utils.wordIndexAt(tokens, frac);
+      const range = this.chunkWordRanges[this.currentChunkIdx];
+      if (!range) return;
+
+      const globalIdx = Math.min(this.allSpans.length - 1, range.startIdx + localIdx);
+      const nextSpan = this.allSpans[globalIdx];
       if (!nextSpan || nextSpan === this.activeWordSpan) return;
 
       if (this.activeWordSpan) {
-        this.activeWordSpan.style.color = 'var(--inactive-text)';
-        this.activeWordSpan.style.textShadow = 'none';
+        this.activeWordSpan.classList.remove('active');
       }
-      const color = THEME.colors[this.config.colorIdx];
-      nextSpan.style.color = color.solid;
-      nextSpan.style.textShadow = `0 0 15px ${color.val}`;
 
-      const rect = nextSpan.getBoundingClientRect();
-      const vh = window.innerHeight;
-      if (rect.top > vh * 0.6 || rect.top < vh * 0.3) {
-        nextSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      nextSpan.classList.add('active');
+
+      if (!this._lastScroll || Date.now() - this._lastScroll > 450) {
+        const rect = nextSpan.getBoundingClientRect();
+        const vh = window.innerHeight;
+        if (rect.top > vh * 0.58 || rect.top < vh * 0.28) {
+          this._lastScroll = Date.now();
+          const targetTop = this.ui.vault.scrollTop + rect.top - (vh * 0.38);
+          this.ui.vault.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+        }
       }
       this.activeWordSpan = nextSpan;
     }
@@ -995,7 +1373,6 @@
       this.audioQueue.forEach(i => URL.revokeObjectURL(i.url));
       this.audioQueue = [];
       this.audio.destroy();
-      this.brain.stop();
       this.ui.destroy();
       if (this.onExit) this.onExit();
     }
@@ -1007,8 +1384,9 @@
   // A small, cheap floating pill on article pages. Nothing else exists until
   // it's clicked: no AudioContext, no fetches, no credits spent.
   class Launcher {
-    constructor(chunks) {
-      this.chunks = chunks;
+    constructor(articleData = null) {
+      this.articleData = articleData;
+      this.chunks = articleData ? (articleData.chunks || []) : [];
       this.controller = null;
 
       this.host = document.createElement('div');
@@ -1024,61 +1402,108 @@
       const style = document.createElement('style');
       style.textContent = `
         @keyframes fr-enter {
-          from { transform: translateY(80px) scale(0.8); opacity: 0; }
-          to { transform: translateY(0) scale(1); opacity: 1; }
-        }
-        @keyframes fr-glow {
-          0%, 100% { box-shadow: 0 8px 30px rgba(0,0,0,0.45), 0 0 18px rgba(124, 92, 255, 0.55); }
-          50% { box-shadow: 0 8px 30px rgba(0,0,0,0.45), 0 0 34px rgba(168, 85, 247, 0.85); }
+          from { transform: translateY(60px) scale(0.85); opacity: 0; }
+          to { transform: translateY(0) scale(1); opacity: 0.18; }
         }
         button {
           display: flex;
           align-items: center;
-          gap: 10px;
-          padding: 14px 22px;
-          border: 1px solid rgba(216, 180, 254, 0.35);
+          gap: 8px;
+          padding: 10px 16px;
+          border: 1px solid rgba(255, 255, 255, 0.12);
           border-radius: 36px;
-          background: linear-gradient(135deg, #6366f1, #a855f7);
-          color: #ffffff;
-          font: 700 15px system-ui, -apple-system, sans-serif;
+          background: #111318;
+          color: #a1a1aa;
+          font: 600 13px system-ui, -apple-system, sans-serif;
           letter-spacing: 0.01em;
           cursor: pointer;
-          animation: fr-enter 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both,
-                     fr-glow 2.4s ease-in-out 0.5s infinite;
-          transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+          opacity: 0.18;
+          filter: grayscale(80%);
+          animation: fr-enter 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+          box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
         button:hover {
+          opacity: 1;
+          filter: grayscale(0%);
+          color: #ffffff;
+          background: linear-gradient(135deg, #6366f1, #a855f7);
+          border-color: rgba(216, 180, 254, 0.45);
           transform: translateY(-3px) scale(1.06);
-          animation-play-state: paused, running;
+          box-shadow: 0 8px 30px rgba(0,0,0,0.45), 0 0 24px rgba(168, 85, 247, 0.65);
         }
         button:active { transform: scale(0.96); }
-        button svg { width: 20px; height: 20px; }
+        button svg { width: 16px; height: 16px; flex-shrink: 0; }
       `;
       shadow.appendChild(style);
 
       this.btn = document.createElement('button');
-      const mins = Math.max(1, Math.round(this.chunks.join(' ').length / 950));
-      this.btn.innerHTML = `${ICONS.headphones} <span>Listen &middot; ${mins} min</span>`;
-      this.btn.title = "Read this page aloud with FocusReader";
+      const mins = Math.max(1, Math.round((document.body?.innerText || "").length / 5000));
+      this.btn.innerHTML = `${ICONS.headphones} <span>Listen &middot; ~${mins}m</span>`;
+      this.btn.title = "Zhavior FocusReader (Hover to expand & listen aloud)";
       this.btn.onclick = () => this.start();
+      this.btn.onmouseenter = () => this.prewarm();
       shadow.appendChild(this.btn);
 
       document.body.appendChild(this.host);
+    }
+
+    async prewarm() {
+      if (this.prewarmed || !this.btn) return;
+      this.prewarmed = true;
+      try {
+        const token = await Utils.getToken();
+        if (!token) return;
+        if (!this.articleData || !this.articleData.chunks || this.articleData.chunks.length === 0) {
+          this.articleData = ArticleExtractor.extract();
+          this.chunks = this.articleData.chunks;
+        }
+        if (this.chunks && this.chunks.length > 0 && !this.prefetchPromise) {
+          const firstChunk = this.chunks[0];
+          this.prefetchPromise = fetch(`${API_BASE}/extension/tts`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ text: firstChunk })
+          }).then(res => res.ok ? res.blob() : null).then(b => b ? URL.createObjectURL(b) : null).catch(() => null);
+        }
+      } catch (e) { /* ignore prewarm errors */ }
     }
 
     async start() {
       if (this.controller) return;
       const token = await Utils.getToken();
       if (!token) {
+        alert("Action Required: Please click the Zhavior extension icon in your browser toolbar (top right) and paste your Access Token to log in!");
         window.open(`${DASHBOARD_URL}/tools`, '_blank');
         return;
       }
+      let data = this.articleData;
+      if (!data || !data.chunks || data.chunks.length === 0) {
+        data = ArticleExtractor.extract();
+      }
+      if (!data || !data.chunks || data.chunks.length === 0) {
+        alert("No speakable article paragraphs found on this webpage.");
+        return;
+      }
+      this.articleData = data;
+      this.chunks = data.chunks;
       this.host.style.display = 'none';
+
+      if (!this.prefetchPromise) {
+        const firstChunk = data.chunks[0];
+        this.prefetchPromise = fetch(`${API_BASE}/extension/tts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ text: firstChunk })
+        }).then(res => res.ok ? res.blob() : null).then(b => b ? URL.createObjectURL(b) : null).catch(() => null);
+      }
+
       const prefs = await Utils.loadPrefs();
-      this.controller = new FocusReaderController(this.chunks, prefs, () => {
+      this.controller = new FocusReaderController(data, prefs, () => {
         this.controller = null;
         this.host.style.display = '';
-      });
+      }, this.prefetchPromise);
+      this.prefetchPromise = null;
     }
 
     destroy() {
@@ -1093,18 +1518,14 @@
   let launcher = null;
 
   function attemptInit() {
-    if (launcher) return;
-    const chunks = ArticleExtractor.extract();
-    if (chunks.length === 0) return;
-    launcher = new Launcher(chunks);
+    if (launcher || !document.body) return;
+    launcher = new Launcher(null);
   }
 
   attemptInit();
-  setTimeout(attemptInit, 1000);
-  setTimeout(attemptInit, 2500);
-  setTimeout(attemptInit, 4000);
+  setTimeout(attemptInit, 800);
 
-  // SPA navigations: re-extract for the new view (unless a session is live).
+  // SPA navigations: reset launcher only if URL changes
   let lastHref = location.href;
   setInterval(() => {
     if (location.href === lastHref) return;
@@ -1114,9 +1535,8 @@
       launcher = null;
     }
     if (!launcher) {
-      setTimeout(attemptInit, 800);
-      setTimeout(attemptInit, 2500);
+      setTimeout(attemptInit, 300);
     }
-  }, 1500);
+  }, 1000);
 
 })();

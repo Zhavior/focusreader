@@ -10,6 +10,11 @@ const isProtectedRoute = createRouteMatcher([
 // The Stripe webhook (/api/webhooks/stripe) is intentionally NOT protected:
 // Stripe authenticates itself via the signed payload, not a Clerk session.
 export default clerkMiddleware(async (auth, req) => {
+  // CORS preflight: let it pass through so Next.js can return the headers
+  // configured in next.config.ts without Clerk intercepting it.
+  if (req.method === "OPTIONS" && req.nextUrl.pathname.startsWith("/api/extension-")) {
+    return;
+  }
   if (isProtectedRoute(req)) {
     await auth.protect();
   }

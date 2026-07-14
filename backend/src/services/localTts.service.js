@@ -29,7 +29,7 @@ function isLocalProviderEnabled() {
   );
 }
 
-function synthesizeChunk(text) {
+function synthesizeChunk(text, voiceName) {
   return new Promise((resolve, reject) => {
     if (process.platform !== "darwin") {
       return reject(
@@ -41,55 +41,92 @@ function synthesizeChunk(text) {
     }
 
     const aiffPath = path.join(os.tmpdir(), `focusreader-${randomUUID()}.aiff`);
-    const sayArgs = ["-o", aiffPath];
-    if (process.env.LOCAL_TTS_VOICE) {
-      sayArgs.push("-v", process.env.LOCAL_TTS_VOICE);
+    const sayArgs = ["-o", aiffPath, "-r", "210"];
+    
+    // Map ElevenLabs / frontend display IDs to real macOS built-in voices
+    const voiceMap = {
+      "Samantha": "Samantha",
+      "Reed (English (US))": "Alex",
+      "Evan": "Evan",
+      "Daniel": "Daniel",
+      "Flo (English (US))": "Victoria"
+    };
+    const cleanVoice = voiceMap[voiceName] || voiceMap[process.env.LOCAL_TTS_VOICE] || voiceName || process.env.LOCAL_TTS_VOICE;
+    if (cleanVoice) {
+      sayArgs.push("-v", cleanVoice);
     }
     sayArgs.push(text);
 
-    const say = spawn("say", sayArgs);
-    let sayErr = "";
-    say.stderr.on("data", (d) => (sayErr += d.toString()));
+    const runSay = (args, fallbackOnFail = true) => {
+      const say = spawn("say", args);
+      let sayErr = "";
+      say.stderr.on("data", (d) => (sayErr += d.toString()));
 
-    say.on("error", () =>
-      reject(new LocalTtsError("Could not launch the local voice engine.", 500))
-    );
+      say.on("error", () =>
+        reject(new LocalTtsError("Could not launch the local voice engine.", 500))
+      );
 
-    say.on("close", (code) => {
-      if (code !== 0) {
-        fs.rmSync(aiffPath, { force: true });
-        return reject(
-          new LocalTtsError(
-            `Local voice synthesis failed: ${sayErr.slice(0, 200) || `exit ${code}`}`,
-            500
-          )
-        );
-      }
+      say.on("close", (code) => {
+        if (code !== 0) {
+          if (fallbackOnFail && cleanVoice) {
+            // Fallback: run `say` with system default voice if selected voice is missing/not installed
+            return runSay(["-o", aiffPath, "-r", "210", text], false);
+          }
+          fs.rmSync(aiffPath, { force: true });
+          return reject(
+            new LocalTtsError(
+              `Local voice synthesis failed: ${sayErr.slice(0, 200) || `exit ${code}`}`,
+              500
+            )
+          );
+        }
 
-      const ffmpeg = spawn("ffmpeg", [
-        "-hide_banner",
-        "-loglevel",
-        "error",
-        "-i",
-        aiffPath,
-        "-c:a",
-        "libmp3lame",
-        "-q:a",
-        "4",
-        "-f",
-        "mp3",
-        "pipe:1",
-      ]);
+        const mp3Path = path.join(os.tmpdir(), `focusreader-${randomUUID()}.mp3`);
+        const ffmpeg = spawn("ffmpeg", [
+          "-y",
+          "-hide_banner",
+          "-loglevel",
+          "error",
+          "-threads",
+          "4",
+          "-i",
+          aiffPath,
+          "-c:a",
+          "libmp3lame",
+          "-q:a",
+          "9",
+          "-f",
+          "mp3",
+          mp3Path,
+        ]);
 
-      const cleanup = () => fs.rmSync(aiffPath, { force: true });
-      ffmpeg.on("close", cleanup);
-      ffmpeg.on("error", (err) => {
-        cleanup();
-        reject(new LocalTtsError(`Transcoding failed: ${err.message}`, 500));
+        const cleanup = () => {
+          fs.rmSync(aiffPath, { force: true });
+          fs.rmSync(mp3Path, { force: true });
+        };
+
+        ffmpeg.on("close", (code) => {
+          if (code !== 0) {
+            cleanup();
+            return reject(new LocalTtsError(`Transcoding failed with exit code ${code}`, 500));
+          }
+          try {
+            const mp3Buf = fs.readFileSync(mp3Path);
+            cleanup();
+            resolve(mp3Buf);
+          } catch (err) {
+            cleanup();
+            reject(new LocalTtsError(`Failed reading MP3: ${err.message}`, 500));
+          }
+        });
+        ffmpeg.on("error", (err) => {
+          cleanup();
+          reject(new LocalTtsError(`Transcoding failed: ${err.message}`, 500));
+        });
       });
+    };
 
-      resolve(ffmpeg.stdout);
-    });
+    runSay(sayArgs, true);
   });
 }
 
