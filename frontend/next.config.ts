@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Self-contained server bundle for the Docker image.
+  output: "standalone",
   reactStrictMode: true,
   // Native module — must be required at runtime, not bundled by webpack.
   serverExternalPackages: ["better-sqlite3"],

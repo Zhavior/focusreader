@@ -1,0 +1,8 @@
+# Automatic HTTPS for both surfaces. DOMAIN comes from compose env.
+app.{$DOMAIN} {
+	reverse_proxy frontend:3000
+}
+
+api.{$DOMAIN} {
+	reverse_proxy backend:4000
+}

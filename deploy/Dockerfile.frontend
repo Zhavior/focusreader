@@ -1,0 +1,23 @@
+# FocusReader frontend — Next.js standalone build
+FROM node:22-alpine AS builder
+WORKDIR /app
+# better-sqlite3 is a native module: needs a toolchain at install time
+RUN apk add --no-cache python3 make g++
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+# Build-time env: real values are injected at runtime via compose; these
+# placeholders only keep prerendering happy.
+ENV NEXT_PUBLIC_APP_URL=http://localhost:3000
+RUN npm run build
+
+FROM node:22-alpine
+WORKDIR /app
+ENV NODE_ENV=production
+ENV DATA_DIR=/data
+# Standalone output bundles node_modules it needs (incl. compiled sqlite)
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+EXPOSE 3000
+CMD ["node", "server.js"]
