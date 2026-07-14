@@ -813,12 +813,13 @@
       pEl.style.marginBottom = '2rem';
       const frag = document.createDocumentFragment();
 
-      words.forEach((word) => {
+      words.forEach((word, wordIdx) => {
         const span = document.createElement('span');
         span.className = 'word';
         span.dataset.rawWord = word;
         span.dataset.bionicHtml = Utils.bionicFormat(word);
         span.innerHTML = this.config.isBionic ? span.dataset.bionicHtml : word;
+        span.onclick = () => this.seekToWord(wordIdx);
         frag.appendChild(span);
         frag.appendChild(document.createTextNode(' '));
         this.activeSpans.push(span);
@@ -832,6 +833,16 @@
       this.activeSpans.forEach(span => {
         span.innerHTML = this.config.isBionic ? span.dataset.bionicHtml : span.dataset.rawWord;
       });
+    }
+
+    /** Click-to-seek within the currently playing chunk's audio. */
+    seekToWord(wordIdx) {
+      const audio = this.audio.voiceAudio;
+      const tokens = this.chunkTokens[this.currentChunkIdx].tokens;
+      if (!audio || !audio.duration || !tokens[wordIdx]) return;
+      audio.currentTime = tokens[wordIdx].startFrac * audio.duration;
+      this.highlightWordAt(tokens, audio.currentTime / audio.duration);
+      if (this.isPaused) this.resumeSystem();
     }
 
     // --- Audio queue: keep up to 2 chunks buffered ahead -------------------
