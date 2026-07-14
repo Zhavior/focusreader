@@ -54,6 +54,14 @@
   // ==========================================
   // UTILITIES
   // ==========================================
+  /** An error the queue must halt on (no retries, no further chunks). */
+  function terminalError(message, action) {
+    const err = new Error(message);
+    err.terminal = true;
+    if (action) err.action = action;
+    return err;
+  }
+
   const Utils = {
     bionicFormat(word) {
       if (word.length <= 1) return `<b>${word}</b>`;
@@ -284,7 +292,7 @@
     async fetchTTS(text, retries = 1) {
       try {
         const token = await Utils.getToken();
-        if (!token) throw new Error("Not logged in — open the extension popup to add your token.");
+        if (!token) throw terminalError("Not logged in — open the extension popup to add your token.");
 
         const res = await fetch(`${API_BASE}/api/extension-tts`, {
           method: 'POST',
@@ -300,10 +308,10 @@
           return this.fetchTTS(text, retries - 1);
         }
         if (res.status === 401) {
-          throw new Error("Token invalid or revoked — generate a new one in Dashboard → Tools.");
+          throw terminalError("Token invalid or revoked — generate a new one in Dashboard → Tools.");
         }
         if (res.status === 402) {
-          throw new Error("Out of credits — upgrade or wait for your renewal.");
+          throw terminalError("Out of credits — open Billing to upgrade.", "billing");
         }
         if (!res.ok) {
           let errMsg = `API Error ${res.status}`;
@@ -314,8 +322,7 @@
         const blob = await res.blob();
         return URL.createObjectURL(blob);
       } catch (err) {
-        const noRetry = /Not logged in|invalid or revoked|Out of credits/.test(err.message);
-        if (retries > 0 && !noRetry) {
+        if (retries > 0 && !err.terminal) {
           await new Promise(r => setTimeout(r, 2000));
           return this.fetchTTS(text, retries - 1);
         }
@@ -541,12 +548,22 @@
       this.shadow.appendChild(this.toastContainer);
     }
 
-    showToast(msg, isError = false) {
+    showToast(msg, isError = false, onClick = null) {
+      // Dedupe: identical message already visible → don't stack another.
+      if (this._lastToastMsg === msg && this._lastToastAt > Date.now() - 4000) return;
+      this._lastToastMsg = msg;
+      this._lastToastAt = Date.now();
+
       const toast = document.createElement('div');
       toast.className = "toast" + (isError ? " error" : "");
-      toast.innerText = msg;
+      toast.innerText = onClick ? `${msg} (click)` : msg;
+      if (onClick) {
+        toast.style.pointerEvents = 'auto';
+        toast.style.cursor = 'pointer';
+        toast.onclick = onClick;
+      }
       this.toastContainer.appendChild(toast);
-      setTimeout(() => toast.remove(), 4000);
+      setTimeout(() => toast.remove(), 6000);
     }
 
     addControlButton(iconHtml, text, isPrimary = false) {
@@ -863,11 +880,21 @@
           })
           .catch(err => {
             console.error("[FocusReader] TTS fetch failed:", err);
-            this.ui.showToast(`TTS Error: ${err.message}`, true);
+            if (err.terminal) {
+              // Out of credits / bad token: stop the queue entirely — one
+              // clear message, zero request storms. Queued audio finishes.
+              this.isQueueActive = false;
+              const action = err.action === "billing"
+                ? () => window.open(`${API_BASE}/dashboard/billing`, '_blank')
+                : () => window.open(`${DASHBOARD_URL}/tools`, '_blank');
+              this.ui.showToast(err.message, true, action);
+            } else {
+              this.ui.showToast(`TTS Error: ${err.message}`, true);
+            }
           })
           .finally(() => {
             this.inflightFetches--;
-            this.fillBuffer();
+            if (this.isQueueActive) this.fillBuffer();
           });
       }
     }
