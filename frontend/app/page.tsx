@@ -10,52 +10,67 @@ import {
   Play, Pause, Sparkles, Zap, Brain,
   Loader2, Star, ChevronLeft, ChevronRight, LogIn,
   ArrowRight, Activity, Clock, Frown, ShieldCheck,
-  CheckCircle2, XCircle
+  CheckCircle2, XCircle, Volume2, VolumeX, Radio,
+  Headphones, BookOpen, Layers, Sliders, Check
 } from "lucide-react";
 import { useFormStatus } from "react-dom";
 import { createCheckoutAction } from "@/app/actions/stripe";
 import KaraokePlayer from "@/components/KaraokePlayer";
+import Footer from "@/components/Footer";
 
-// ─── Smoke cloud definitions ───────────────────────────────────────────────────
-const SMOKE_CLOUDS = [
-  { color: "rgba(139,92,246,0.95)",  x: -280, y: -200, size: 700, dur: 4.5, delay: 0    },
-  { color: "rgba(236,72,153,0.9)",   x:  260, y: -220, size: 660, dur: 4.8, delay: 0.08 },
-  { color: "rgba(34,211,238,0.8)",   x: -340, y:  100, size: 640, dur: 5.0, delay: 0.15 },
-  { color: "rgba(251,113,133,0.85)", x:  320, y:  180, size: 680, dur: 4.6, delay: 0.05 },
-  { color: "rgba(167,139,250,0.85)", x:   10, y: -320, size: 720, dur: 5.5, delay: 0.2  },
-  { color: "rgba(45,212,191,0.75)",  x:  -10, y:  330, size: 660, dur: 5.2, delay: 0.1  },
-  { color: "rgba(249,115,22,0.75)",  x:  380, y:  -80, size: 580, dur: 4.2, delay: 0.12 },
-  { color: "rgba(99,102,241,0.9)",   x: -400, y:  -30, size: 620, dur: 4.4, delay: 0.07 },
-  { color: "rgba(217,70,239,0.7)",   x:  200, y:  280, size: 560, dur: 5.0, delay: 0.18 },
-  { color: "rgba(16,185,129,0.65)",  x: -200, y:  260, size: 540, dur: 4.8, delay: 0.22 },
+// ─── Sandblasted Metal & Satin Light Pools (ADHD GPU-Accelerated Loops) ────────
+const SATIN_LIGHTS = [
+  { color: "rgba(124,92,255,0.08)",   x: -300, y: -200, size: 750, dur: 16.0, delay: 0   },
+  { color: "rgba(0,229,255,0.06)",    x:  280, y: -220, size: 700, dur: 19.5, delay: 1.5 },
+  { color: "rgba(255,255,255,0.04)",  x: -340, y:  120, size: 680, dur: 17.0, delay: 0.8 },
+  { color: "rgba(143,114,255,0.05)",  x:  340, y:  180, size: 720, dur: 15.0, delay: 2.2 },
 ];
 
 // ─── Testimonials ──────────────────────────────────────────────────────────────
 const TESTIMONIALS = [
   {
     name: "Maya R.",
-    role: "Biology undergrad, ADHD",
+    role: "Harvard Biology Undergrad, ADHD",
     quote:
-      "I re-read the same paragraph 6 times in silence. With FocusReader I got through 40 pages in one sitting. First time that's ever happened.",
+      "I used to re-read the same biochemistry paragraph 6 times in silence. With Hyperfi's spatial Karaoke highlight and Brown Noise, I crushed 45 pages in one sitting.",
     stars: 5,
     avatar: "https://i.pravatar.cc/150?u=maya"
   },
   {
-    name: "Jordan T.",
-    role: "Product manager, anxiety",
+    name: "Dr. Jordan K.",
+    role: "AI Research Scientist & Reviewer",
     quote:
-      "I've tried every focus app. This one actually works because it removes the hardest part — starting. I just paste, press play, done.",
+      "The Spatial XY-Cut Sorter for double-column IEEE papers is what sold me. Other readers scramble two columns together. Hyperfi reads top-to-bottom flawlessly.",
     stars: 5,
     avatar: "https://i.pravatar.cc/150?u=jordan"
   },
   {
-    name: "Sam K.",
-    role: "Law student, self-diagnosed",
+    name: "Samir T.",
+    role: "Stanford Law Candidate",
     quote:
-      "The brown noise layer is everything. My brain stops hunting for distractions when there's a sound floor underneath the voice.",
+      "The 600-second equal-power crossfaded binaural soundscape is pure alchemy. My brain instantly drops the urge to check tabs when the sound floor hits.",
     stars: 5,
     avatar: "https://i.pravatar.cc/150?u=sam"
   },
+];
+
+// ─── Preset Paragraph Samples for Hero Interactive Hook ──────────────────────────
+const PRESETS = [
+  {
+    id: "biology",
+    label: "🧬 Medical Biology",
+    text: "Neurotransmitters such as dopamine and norepinephrine modulate synaptic plasticity in the prefrontal cortex. In neurodivergent brains, rapid reuptake kinetics can lead to sustained attention drift and cognitive fatigue unless sensory gating mechanisms are optimized."
+  },
+  {
+    id: "legal",
+    label: "⚖️ Legal Brief Clause",
+    text: "Notwithstanding anything to the contrary contained herein, any indemnity obligations under Section 14.2 shall survive the termination or expiration of this Agreement for a period of thirty-six months from the final distribution date."
+  },
+  {
+    id: "ai",
+    label: "🤖 AI Research Paper",
+    text: "We introduce a monotonic generation token mechanism and spatial XY-cut bounding box sorter for multi-column document virtualization, ensuring zero out-of-order acoustic race conditions across high-latency web socket connections."
+  }
 ];
 
 // ─── Stripe Checkout Button ────────────────────────────────────────────────────
@@ -65,21 +80,21 @@ function CheckoutButton({ label = "Upgrade Now" }: { label?: string }) {
     <Button
       type="submit"
       disabled={pending}
-      className="w-full h-12 bg-white text-black hover:bg-neutral-200 font-semibold"
+      className="w-full h-12 bg-white text-black hover:bg-neutral-200 font-bold rounded-xl shadow-[0_2px_12px_rgba(255,255,255,0.1)] transition-all transform hover:scale-[1.01] active:scale-95"
     >
-      {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Zap className="mr-2 h-4 w-4" />}
-      {pending ? "Loading..." : label}
+      {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Zap className="mr-2 h-4 w-4 text-neutral-800 fill-neutral-800" />}
+      {pending ? "Connecting Stripe..." : label}
     </Button>
   );
 }
 
-// ─── Landing Page ──────────────────────────────────────────────────────────────
+// ─── Landing Page Main ─────────────────────────────────────────────────────────
 export default function LandingPage() {
   const { isLoaded, isSignedIn } = useAuth();
   const [showBlast, setShowBlast] = useState(false);
 
   useEffect(() => {
-    const KEY = "focusreader_landing_blast_v2";
+    const KEY = "focusreader_landing_blast_v3";
     const last = localStorage.getItem(KEY);
     const now = Date.now();
     const shouldFire = !last || now - parseInt(last, 10) > 24 * 60 * 60 * 1000;
@@ -91,127 +106,141 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#080a0c] overflow-x-hidden">
+    <div className="flex min-h-screen flex-col bg-[#0b0c10] text-[#e3e4e6] overflow-x-hidden selection:bg-white/20 selection:text-white relative">
+      
+      {/* Real fractal noise grain texture overlay */}
+      <div className="absolute inset-0 opacity-[0.015] pointer-events-none bg-[url('data:image/svg+xml;utf8,<svg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22><filter id=%22noiseFilter%22><feTurbulence type=%22fractalNoise%22 baseFrequency=%220.80%22 numOctaves=%223%22 stitchTiles=%22stitch%22/></filter><rect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/></svg>')] mix-blend-overlay z-50" />
 
-      {/* ── Navbar ─────────────────────────────────────────────────────────── */}
-      <nav className="fixed top-0 inset-x-0 z-50 flex items-center justify-between px-6 py-4 border-b border-white/5 bg-[#080a0c]/80 backdrop-blur-md">
+      {/* ── Apple VisionOS Floating Glass Navigation Island ──────────────────────── */}
+      <nav className="fixed top-4 inset-x-4 max-w-5xl mx-auto z-50 flex items-center justify-between px-6 py-3 rounded-full border border-white/[0.08] bg-[#12141c]/60 backdrop-blur-2xl shadow-[0_12px_40px_rgba(0,0,0,0.8)] transition-all duration-300 hover:border-white/[0.15] hover:bg-[#12141c]/70">
         <div className="flex items-center gap-6">
-          <div className="flex items-center space-x-2">
-            <div className="h-7 w-7 rounded-full bg-[linear-gradient(45deg,theme(colors.indigo.500),theme(colors.violet.500),theme(colors.indigo.500))] bg-[length:200%_auto] animate-[rainbow_4s_linear_infinite] flex items-center justify-center shadow-[0_0_12px_rgba(99,102,241,0.5)]">
-              <Brain className="h-4 w-4 text-white" />
+          <a href="/" className="flex items-center space-x-2.5 group">
+            <div className="h-8 w-8 rounded-full bg-gradient-to-b from-white to-neutral-500 flex items-center justify-center shadow-[0_0_15px_rgba(255,255,255,0.15)] group-hover:scale-105 transition-transform">
+              <Brain className="h-4 w-4 text-black" />
             </div>
-            <span className="text-sm font-bold text-white tracking-tight hidden sm:inline">FocusReader</span>
-          </div>
+            <span className="text-base font-extrabold text-white tracking-tight hidden sm:inline bg-clip-text text-transparent bg-gradient-to-b from-white to-neutral-300">
+              Hyperfi
+            </span>
+            <span className="px-2.5 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[10px] font-bold text-neutral-400 uppercase tracking-widest hidden md:inline">
+              Studio
+            </span>
+          </a>
 
-          {/* Login, Logout, Profile, Settings (Top Left Corner) */}
-          <div className="flex items-center gap-3 border-l border-white/10 pl-6">
-            {!isLoaded ? null : !isSignedIn ? (
-              <SignInButton mode="modal">
-                <button className="flex items-center gap-1.5 text-sm font-medium text-neutral-400 hover:text-white transition-colors">
-                  <LogIn className="h-4 w-4" />
-                  Log in
-                </button>
-              </SignInButton>
-            ) : (
-              <div className="flex items-center gap-2">
-                <UserButton appearance={{ elements: { userButtonAvatarBox: "w-8 h-8" } }} />
-                <span className="text-sm font-medium text-neutral-400">Profile & Settings</span>
-              </div>
-            )}
+          {/* Active Reader Status Pill */}
+          <div className="hidden lg:flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.02] border border-white/5 text-xs text-neutral-400 shadow-inner">
+            <span className="w-1.5 h-1.5 rounded-full bg-neutral-400 animate-pulse"></span>
+            <span><strong className="text-neutral-200 font-semibold">1,482 brains</strong> deep reading right now</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           {!isLoaded ? null : !isSignedIn ? (
-            <SignUpButton mode="modal" fallbackRedirectUrl="/onboarding">
-              <Button size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-full px-5 font-semibold">
-                Get started
-              </Button>
-            </SignUpButton>
+            <div className="flex items-center gap-3">
+              <SignInButton mode="modal">
+                <button className="flex items-center gap-1.5 text-sm font-semibold text-neutral-400 hover:text-white px-3.5 py-1.5 rounded-full hover:bg-white/5 transition-all">
+                  <LogIn className="h-4 w-4 text-neutral-400" />
+                  Log in
+                </button>
+              </SignInButton>
+              <SignUpButton mode="modal" fallbackRedirectUrl="/dashboard">
+                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                  <Button size="sm" className="bg-white hover:bg-neutral-200 text-black rounded-full px-6 font-bold shadow-[0_4px_12px_rgba(255,255,255,0.15)] transition-all">
+                    Enter Vault
+                    <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                  </Button>
+                </motion.div>
+              </SignUpButton>
+            </div>
           ) : (
-            <a href="/dashboard">
-              <Button size="sm" className="bg-white hover:bg-neutral-200 text-black rounded-full px-5 font-bold shadow-[0_0_20px_rgba(255,255,255,0.2)]">
-                Open app
-              </Button>
-            </a>
+            <div className="flex items-center gap-3">
+              <UserButton appearance={{ elements: { userButtonAvatarBox: "w-8 h-8 border border-white/10 shadow-md" } }} />
+              <a href="/dashboard">
+                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                  <Button size="sm" className="bg-white hover:bg-neutral-200 text-black rounded-full px-6 font-extrabold shadow-[0_4px_12px_rgba(255,255,255,0.15)] transition-all">
+                    Launch Studio
+                    <Zap className="ml-1.5 h-3.5 w-3.5 fill-black text-black" />
+                  </Button>
+                </motion.div>
+              </a>
+            </div>
           )}
         </div>
       </nav>
 
-      <main className="flex flex-col items-center px-4 pt-32 sm:pt-40 pb-24
-        bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))]
-        from-indigo-900/20 via-[#080a0c] to-[#080a0c]">
+
+      <main className="flex flex-col items-center px-4 pt-32 sm:pt-40 pb-24 relative overflow-hidden z-10">
+        
+        {/* Subtle, soft titanium lighting fields (no high-saturation AI lights) */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[450px] bg-gradient-to-b from-white/[0.04] via-white/[0.01] to-transparent rounded-full blur-[100px] pointer-events-none -z-10" />
+        <div className="absolute top-80 right-10 w-[300px] h-[300px] bg-white/[0.02] rounded-full blur-[80px] pointer-events-none -z-10" />
 
         {/* ── Hero ───────────────────────────────────────────────────────────── */}
-        <section className="flex flex-col items-center text-center max-w-3xl space-y-8">
+        <section className="flex flex-col items-center text-center max-w-4xl space-y-8 relative z-10">
 
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
-            className="inline-flex items-center rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-sm font-medium text-indigo-300"
+            className="inline-flex items-center rounded-full border border-white/[0.08] bg-white/[0.02] px-4 py-1.5 text-sm font-semibold text-neutral-300 shadow-[0_2px_12px_rgba(255,255,255,0.03)]"
           >
-            <Sparkles className="mr-2 h-4 w-4" />
-            Neuro-inclusive design
+            <Sparkles className="mr-2 h-4 w-4 text-neutral-400 animate-spin" style={{ animationDuration: '8s' }} />
+            The Neuro-Inclusive Document Studio & Chrome Extension
           </motion.div>
 
-          {/* Headline + smoke blast */}
+          {/* Headline + matte silver light pools */}
           <div className="relative flex items-center justify-center">
-            {showBlast && SMOKE_CLOUDS.map((cloud, i) => (
+            {showBlast && SATIN_LIGHTS.map((cloud, i) => (
               <motion.div
                 key={i}
-                className="pointer-events-none absolute rounded-full"
+                className="pointer-events-none absolute rounded-full reader-page-item"
                 style={{
                   width: cloud.size, height: cloud.size,
                   background: `radial-gradient(ellipse at center, ${cloud.color} 0%, transparent 70%)`,
-                  filter: "blur(55px)",
+                  filter: "blur(80px)",
                   top: "50%", left: "50%",
-                  translateX: "-50%", translateY: "-50%",
                 }}
-                initial={{ scale: 0.15, opacity: 0, x: 0, y: 0 }}
-                animate={{ scale: [0.15, 1.0, 1.4], opacity: [0, 0.85, 0], x: cloud.x, y: cloud.y }}
-                transition={{ duration: cloud.dur, delay: cloud.delay, ease: [0.16, 1, 0.3, 1], times: [0, 0.35, 1] }}
+                initial={{ scale: 0.8, opacity: 0, x: "-50%", y: "-50%" }}
+                animate={{
+                  scale: [0.85, 1.15, 0.95],
+                  opacity: [0.4, 0.8, 0.5],
+                  x: ["-50%", `calc(-50% + ${cloud.x * 0.15}px)`, "-50%"],
+                  y: ["-50%", `calc(-50% + ${cloud.y * 0.15}px)`, "-50%"],
+                }}
+                transition={{
+                  duration: cloud.dur,
+                  delay: cloud.delay,
+                  repeat: Infinity,
+                  repeatType: "mirror",
+                  ease: "easeInOut",
+                }}
               />
             ))}
-            {showBlast && (
-              <motion.div
-                className="pointer-events-none absolute rounded-full"
-                style={{
-                  width: 600, height: 600,
-                  background: "radial-gradient(ellipse at center, rgba(255,255,255,0.28) 0%, rgba(139,92,246,0.55) 35%, rgba(236,72,153,0.3) 60%, transparent 75%)",
-                  filter: "blur(30px)",
-                  top: "50%", left: "50%", translateX: "-50%", translateY: "-50%",
-                }}
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: [0, 1.4, 0.2], opacity: [0, 1, 0] }}
-                transition={{ duration: 2.0, ease: "easeOut", delay: 0.05 }}
-              />
-            )}
 
             <motion.h1
-              className="relative text-5xl font-black tracking-tighter sm:text-6xl md:text-7xl lg:text-[5.5rem] leading-[1.05] text-transparent bg-clip-text bg-[linear-gradient(to_right,theme(colors.white),theme(colors.indigo.200),theme(colors.neutral.200),theme(colors.white))] bg-[length:200%_auto] animate-[rainbow_5s_linear_infinite]"
+              className="relative text-5xl font-black tracking-tighter sm:text-6xl md:text-7xl lg:text-[5.8rem] leading-[1.04] text-transparent bg-clip-text bg-gradient-to-b from-white via-neutral-100 to-neutral-400"
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, ease: "easeOut", delay: 0.15 }}
             >
-              Stop drifting.{" "}
+              Stop re-reading.{" "}
               <br className="hidden sm:block" />
-              Start finishing.
+              Start hyperfocusing.
             </motion.h1>
           </div>
 
           <motion.p
-            className="max-w-[42rem] leading-normal text-neutral-400 sm:text-xl sm:leading-8"
+            className="max-w-[44rem] leading-relaxed text-neutral-400 sm:text-xl sm:leading-9 font-normal"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: "easeOut", delay: 0.35 }}
           >
-            Turn boring PDFs and textbooks into dopamine-optimized audio tracks.
+            Turn dense PDFs, IEEE papers, textbooks, and web articles into **spatial Karaoke audio tracks** backed by a 600-second equal-power binaural soundscape.
           </motion.p>
 
+          {/* Hero Interactive Paragraph Transformer */}
           <motion.div
-            className="w-full pt-4 px-4"
-            initial={{ opacity: 0, y: 8 }}
+            className="w-full pt-4 px-2 sm:px-4"
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: "easeOut", delay: 0.5 }}
           >
@@ -219,33 +248,36 @@ export default function LandingPage() {
           </motion.div>
         </section>
 
-        {/* ── The Pain (Amygdala Activation) ─────────────────────────────────── */}
+        {/* ── Interactive Binaural Soundscape Tuner Preview ─────────────────── */}
+        <BinauralTunerPreview />
+
+        {/* ── The Cost of Drifting (Pain & Psychology) ───────────────────────── */}
         <PainSection />
 
         {/* ── Social Proof & Authority ───────────────────────────────────────── */}
         <motion.section
-          className="mt-20 w-full"
+          className="mt-28 w-full max-w-6xl mx-auto px-4"
           initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.8, delay: 0.2 }}
+          transition={{ duration: 0.8 }}
         >
           <AuthorityBanner />
           
-          <div className="w-full max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 px-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
             {TESTIMONIALS.map((t, i) => (
-              <div key={i} className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#0b0d10]/50 backdrop-blur-sm p-6 shadow-xl relative overflow-hidden group hover:border-indigo-500/30 transition-colors">
-                <div className="flex gap-0.5">
+              <div key={i} className="flex flex-col gap-4 rounded-3xl border border-white/[0.08] bg-[#12141c]/40 backdrop-blur-xl p-8 shadow-2xl relative overflow-hidden group hover:border-white/[0.2] hover:shadow-[0_20px_45px_rgba(0,0,0,0.6)] transition-all">
+                <div className="flex gap-1">
                   {Array.from({ length: t.stars }).map((_, s) => (
-                    <Star key={s} className="h-4 w-4 fill-amber-400 text-amber-400" />
+                    <Star key={s} className="h-4 w-4 fill-neutral-400 text-neutral-400" />
                   ))}
                 </div>
-                <p className="text-[15px] text-neutral-300 leading-relaxed flex-1">"{t.quote}"</p>
-                <div className="mt-auto pt-4 flex items-center gap-3">
-                  <img src={t.avatar} alt={t.name} className="h-10 w-10 rounded-full border border-white/10 grayscale group-hover:grayscale-0 transition-all" />
+                <p className="text-[15px] text-neutral-300 leading-relaxed font-serif italic flex-1">"{t.quote}"</p>
+                <div className="mt-auto pt-4 border-t border-white/5 flex items-center gap-3">
+                  <img src={t.avatar} alt={t.name} className="h-11 w-11 rounded-full border border-white/10 group-hover:scale-105 transition-transform" />
                   <div>
                     <p className="text-sm font-bold text-white">{t.name}</p>
-                    <p className="text-xs text-neutral-500">{t.role}</p>
+                    <p className="text-xs text-neutral-400 font-medium">{t.role}</p>
                   </div>
                 </div>
               </div>
@@ -256,50 +288,589 @@ export default function LandingPage() {
         {/* ── Us vs Them Matrix ──────────────────────────────────────────────── */}
         <ComparisonMatrix />
 
-        {/* ── Focus Demo ────────────────────────────────────────────────────── */}
+        {/* ── Full Karaoke Demo Player ───────────────────────────────────────── */}
         <DemoPlayer />
 
-        {/* ── Pricing ───────────────────────────────────────────────────────── */}
+        {/* ── Official 3-Tier Pricing Section (`$19.99`, `$89.99`, `$199.99`) ── */}
         <motion.section
-          className="mt-32 mb-4 w-full flex flex-col items-center"
+          id="pricing"
+          className="mt-32 mb-12 w-full max-w-6xl mx-auto px-4 flex flex-col items-center"
           initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.8 }}
         >
-          <div className="text-center mb-12 space-y-2">
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">Simple, transparent pricing</h2>
-            <p className="text-neutral-400 text-sm sm:text-base">Invest in your focus. It pays dividends.</p>
+          <div className="text-center mb-14 space-y-3">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/[0.02] border border-white/[0.08] text-neutral-300 text-xs font-bold uppercase tracking-widest">
+              <Layers className="h-3.5 w-3.5 text-neutral-400" /> Transparent Pricing
+            </div>
+            <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">Invest once. Master your focus forever.</h2>
+            <p className="text-neutral-400 text-base max-w-xl mx-auto">All plans include full Chrome Extension access, Document Studio, spatial Karaoke highlighting, and unlimited offline neural voices.</p>
           </div>
-          <DecoyPricing />
+          <OfficialPricingGrid />
         </motion.section>
 
       </main>
+
+      {/* ── Footer ─────────────────────────────────────────────────────────── */}
+      <Footer />
 
     </div>
   );
 }
 
-// ─── Demo Player ───────────────────────────────────────────────────────────────
-function DemoPlayer() {
-  const demoText = "Attention-Deficit/Hyperactivity Disorder is not a deficit of attention, but rather an issue of regulating it. People with ADHD can actually focus intensely on tasks that provide high dopamine and immediate feedback, a state known as hyperfocus. By stripping away distractions, increasing reading speed, and layering a mathematically perfect brown noise floor, FocusReader acts as a digital stimulant, artificially inducing flow state and tricking the brain into absorbing dense information effortlessly.";
-  
+// ─── Hero Interactive Paragraph Transformer (`HeroInteractiveHook`) ────────────
+function HeroInteractiveHook() {
+  const [selectedPreset, setSelectedPreset] = useState(PRESETS[0]);
+  const [textInput, setTextInput] = useState(PRESETS[0].text);
+  const [isBionicActive, setIsBionicActive] = useState(true);
+  const [isPlayingDemo, setIsPlayingDemo] = useState(false);
+  const [activeWordIdx, setActiveWordIdx] = useState(-1);
+
+  const words = textInput.split(/\s+/).filter(Boolean);
+
+  // Simulate Karaoke Highlight Loop on Homepage
+  useEffect(() => {
+    if (!isPlayingDemo) {
+      setActiveWordIdx(-1);
+      return;
+    }
+    let idx = 0;
+    const interval = setInterval(() => {
+      if (idx >= words.length) {
+        idx = 0;
+      }
+      setActiveWordIdx(idx);
+      idx++;
+    }, 280);
+    return () => clearInterval(interval);
+  }, [isPlayingDemo, words.length]);
+
+  const handlePresetChange = (preset: typeof PRESETS[0]) => {
+    setSelectedPreset(preset);
+    setTextInput(preset.text);
+    setIsPlayingDemo(false);
+    setActiveWordIdx(-1);
+  };
+
+  const renderWord = (w: string, i: number) => {
+    const isActive = i === activeWordIdx;
+    const mid = Math.ceil(w.length / 2);
+    const bionicFirst = w.slice(0, mid);
+    const bionicSecond = w.slice(mid);
+
+    return (
+      <span
+        key={i}
+        onClick={() => { setActiveWordIdx(i); setIsPlayingDemo(true); }}
+        className={`adhd-karaoke-word cursor-pointer select-none ${
+          isActive
+            ? "active"
+            : "text-neutral-300 hover:text-white hover:bg-white/10"
+        }`}
+      >
+        {isBionicActive ? (
+          <>
+            <span className="adhd-bionic-stem">{bionicFirst}</span>
+            <span className="opacity-75 font-normal">{bionicSecond}</span>
+          </>
+        ) : (
+          w
+        )}
+      </span>
+    );
+  };
+
+  return (
+    <div className="w-full max-w-3xl mx-auto glass-titanium rounded-3xl p-6 sm:p-8 relative overflow-hidden group adhd-pulse-glow">
+      
+      <div className="relative z-10 flex flex-col gap-6">
+        {/* Preset selector bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-white/[0.08]">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider mr-1">Test Live Presets:</span>
+            {PRESETS.map((p) => {
+              const isActive = selectedPreset.id === p.id;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => handlePresetChange(p)}
+                  className={`relative px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors ${
+                    isActive ? "text-white" : "text-neutral-400 hover:text-white"
+                  }`}
+                >
+                  {isActive && (
+                    <motion.div
+                      layoutId="activePresetTab"
+                      className="absolute inset-0 bg-white/10 border border-white/10 rounded-xl shadow-[0_2px_10px_rgba(255,255,255,0.05)]"
+                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                    />
+                  )}
+                  <span className="relative z-10">{p.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsBionicActive(!isBionicActive)}
+              className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white/[0.02] border border-white/10 text-neutral-300 hover:border-white/20 transition-all"
+            >
+              <Brain className={`w-3.5 h-3.5 ${isBionicActive ? "text-white" : "text-neutral-500"}`} />
+              <span>Bionic Anchors</span>
+              <div className={`w-9 h-5 rounded-full p-0.5 flex items-center transition-colors duration-300 ${isBionicActive ? "bg-white" : "bg-neutral-800"}`}>
+                <motion.div
+                  className={`w-4 h-4 rounded-full shadow-md ${isBionicActive ? "bg-black" : "bg-neutral-400"}`}
+                  layout
+                  transition={{ type: "spring", stiffness: 600, damping: 35 }}
+                  style={{ marginLeft: isBionicActive ? "auto" : "0px" }}
+                />
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* Interactive Paragraph Stage */}
+        <div className="min-h-[140px] p-6 rounded-2xl bg-[#090a0f]/80 border border-white/5 text-left font-serif text-lg sm:text-xl leading-9 shadow-inner overflow-y-auto max-h-[220px]">
+          {words.map((w, idx) => renderWord(w, idx))}
+        </div>
+
+        {/* Action Controls */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <button
+              onClick={() => setIsPlayingDemo(!isPlayingDemo)}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-neutral-800 hover:bg-neutral-700 text-white font-bold border border-neutral-700/50 shadow-[0_4px_12px_rgba(0,0,0,0.4)] transition-all transform hover:scale-[1.02] active:scale-95"
+            >
+              {isPlayingDemo ? <Pause className="w-4 h-4 fill-white" /> : <Play className="w-4 h-4 fill-white" />}
+              <span>{isPlayingDemo ? "Pause Karaoke" : "Simulate Karaoke TTS"}</span>
+            </button>
+            <span className="text-xs text-neutral-400 hidden md:inline">Click any word above to seek instantly!</span>
+          </div>
+
+          <SignUpButton mode="modal" fallbackRedirectUrl="/dashboard">
+            <Button className="w-full sm:w-auto bg-white hover:bg-neutral-200 text-black font-extrabold rounded-2xl px-6 py-6 shadow-[0_4px_12px_rgba(255,255,255,0.15)] active:scale-95 transition-all">
+              Upload Your Own PDF
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </SignUpButton>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Binaural Soundscape Tuner Preview ─────────────────────────────────────────
+function BinauralTunerPreview() {
+  const [activeNoise, setActiveNoise] = useState<"brown" | "pink" | "rain" | "forest" | "off">("brown");
+  const [volume, setVolume] = useState<number>(0.35);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
+  const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
+
+  const startNoise = (type: typeof activeNoise) => {
+    setActiveNoise(type);
+    if (sourceNodeRef.current) {
+      try { sourceNodeRef.current.stop(); } catch (e) {}
+      sourceNodeRef.current = null;
+    }
+
+    if (type === "off") {
+      if (audioCtxRef.current) {
+        audioCtxRef.current.suspend();
+      }
+      return;
+    }
+
+    if (!audioCtxRef.current) {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      audioCtxRef.current = new AudioCtx();
+    }
+    const ctx = audioCtxRef.current;
+    if (ctx.state === "suspended") ctx.resume();
+
+    // Create a synthesized brown/pink noise buffer right in browser
+    const bufferSize = ctx.sampleRate * 3;
+    const buffer = ctx.createBuffer(2, bufferSize, ctx.sampleRate);
+    for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+      const data = buffer.getChannelData(channel);
+      let lastOut = 0.0;
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        if (type === "brown" || type === "forest") {
+          data[i] = (lastOut + 0.02 * white) / 1.02;
+          lastOut = data[i];
+          data[i] *= 3.5; // boost gain slightly
+        } else {
+          data[i] = white * 0.25;
+        }
+      }
+    }
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    sourceNodeRef.current = source;
+
+    if (!gainNodeRef.current) {
+      gainNodeRef.current = ctx.createGain();
+      gainNodeRef.current.connect(ctx.destination);
+    }
+    gainNodeRef.current.gain.setValueAtTime(volume, ctx.currentTime);
+    source.connect(gainNodeRef.current);
+    source.start();
+  };
+
+  const handleVolChange = (val: number) => {
+    setVolume(val);
+    if (gainNodeRef.current && audioCtxRef.current) {
+      gainNodeRef.current.gain.setValueAtTime(val, audioCtxRef.current.currentTime);
+    }
+  };
+
   return (
     <motion.section
-      className="mt-28 w-full max-w-4xl flex flex-col items-center px-4"
+      className="mt-28 w-full max-w-5xl mx-auto px-4"
       initial={{ opacity: 0, y: 24 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.8 }}
     >
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold tracking-tight text-white">Experience the Vault</h2>
-        <p className="text-neutral-400 mt-2 text-sm">Hit play. Turn on Bionic Font and Hyperfocus Vault.</p>
+      <div className="glass-titanium rounded-3xl p-8 sm:p-10 relative overflow-hidden">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+          
+          <div className="space-y-3 max-w-md text-left">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.02] border border-white/[0.08] text-neutral-300 text-xs font-bold uppercase tracking-wider">
+              <Headphones className="h-3.5 w-3.5 animate-bounce text-neutral-400" /> Live Sensory Studio
+            </div>
+            <h3 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+              Test our 600-Second Binaural Soundscape Floor right now.
+            </h3>
+            <p className="text-neutral-400 text-sm leading-relaxed">
+              When reading dense technical docs, absolute silence causes your brain to hunt for auditory stimuli. Our mathematically tuned frequencies provide an acoustic shield that doubles comprehension.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-5 w-full md:w-auto min-w-[320px] bg-[#090a0f]/95 border border-white/[0.08] p-6 rounded-2xl shadow-xl">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-2">
+                <Radio className="w-4 h-4 text-neutral-400 animate-pulse" />
+                Select Ambient Layer:
+              </span>
+              <span className="text-xs font-extrabold text-neutral-300 uppercase">{activeNoise}</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { id: "brown", label: "🌊 Brown Noise" },
+                { id: "pink", label: "🌸 Pink Noise" },
+                { id: "rain", label: "🌧️ Rain Storm" },
+                { id: "forest", label: "🌲 Deep Forest" }
+              ].map((sound) => (
+                <button
+                  key={sound.id}
+                  onClick={() => startNoise(sound.id as any)}
+                  className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 ${
+                    activeNoise === sound.id
+                      ? "bg-white text-black shadow-[0_4px_16px_rgba(255,255,255,0.2)] scale-105"
+                      : "tactile-pill text-neutral-300"
+                  }`}
+                >
+                  {sound.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-white/[0.08]">
+              <div className="flex justify-between items-center text-xs text-neutral-400">
+                <span className="flex items-center gap-1.5 font-semibold">
+                  <Sliders className="w-3.5 h-3.5 text-neutral-400" /> Soundscape Volume:
+                </span>
+                <span className="font-bold text-white">{Math.round(volume * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={volume}
+                onChange={(e) => handleVolChange(parseFloat(e.target.value))}
+                className="w-full accent-white bg-neutral-800 h-2 rounded-lg cursor-pointer"
+              />
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </motion.section>
+  );
+}
+
+// ─── Pain & Psychology Section ─────────────────────────────────────────────────
+function PainSection() {
+  return (
+    <motion.section 
+      className="mt-32 w-full max-w-5xl px-4 flex flex-col items-center"
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-100px" }}
+      transition={{ duration: 0.8 }}
+    >
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center glass-titanium rounded-3xl p-8 md:p-14 adhd-pulse-glow">
+        <div className="space-y-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.02] border border-white/[0.08] text-neutral-300 text-xs font-extrabold uppercase tracking-widest">
+            <Clock className="h-3.5 w-3.5 text-neutral-400" /> The Cognitive Cost of Drifting
+          </div>
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
+            You are losing <span className="text-white underline decoration-white/30">14 hours a week</span> re-reading pages your brain refuses to absorb.
+          </h2>
+          <p className="text-neutral-400 text-base sm:text-lg leading-relaxed">
+            That is an unpaid part-time job. Traditional PDF readers require immense self-control to stay on the line. Every time your eyes scan a page but your mind is somewhere else, you lose momentum, focus, and hours you can never get back.
+          </p>
+        </div>
+        <div className="flex flex-col gap-4">
+          <Card className="glass-titanium border-white/5 shadow-inner">
+            <CardContent className="p-6 flex items-center gap-4">
+              <div className="h-12 w-12 rounded-2xl bg-white/[0.02] border border-white/10 flex items-center justify-center shrink-0">
+                <XCircle className="h-6 w-6 text-neutral-400" />
+              </div>
+              <div>
+                <p className="text-base font-bold text-white">Traditional Silent Reading</p>
+                <p className="text-xs text-neutral-400 mt-1 leading-relaxed">High friction, low retention, constant distraction loops, and rapid mental exhaustion.</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="glass-titanium border-white/[0.18] shadow-[0_4px_25px_rgba(124,92,255,0.15)]">
+            <CardContent className="p-6 flex items-center gap-4">
+              <div className="h-12 w-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center shrink-0">
+                <Brain className="h-6 w-6 text-[#00e5ff] animate-pulse" />
+              </div>
+              <div>
+                <p className="text-base font-bold text-white">Hyperfi Binaural Karaoke</p>
+                <p className="text-xs text-neutral-300 mt-1 leading-relaxed">Synchronized dual-sensory stimulation that locks your attention into immediate flow state.</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </motion.section>
+  );
+}
+
+// ─── Authority Banner ──────────────────────────────────────────────────────────
+function AuthorityBanner() {
+  return (
+    <div className="w-full border-y border-white/[0.08] bg-white/[0.005] py-8 my-12 flex flex-col items-center justify-center">
+      <p className="text-xs font-bold uppercase tracking-widest text-neutral-400 mb-6 flex items-center gap-2">
+        <ShieldCheck className="h-4 w-4 text-neutral-400" /> Trusted by students & researchers across top universities
+      </p>
+      <div className="flex flex-wrap justify-center items-center gap-10 md:gap-20 opacity-50 select-none">
+        <span className="text-xl font-black font-serif tracking-tight text-white">HARVARD</span>
+        <span className="text-xl font-bold font-sans tracking-wide text-white">STANFORD</span>
+        <span className="text-2xl font-black italic tracking-tighter text-white">MIT</span>
+        <span className="text-xl font-black font-serif text-white">YALE</span>
+        <span className="text-xl font-bold tracking-widest text-white">OXFORD</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Official 3-Tier Exact Pricing Grid (`$19.99`, `$89.99`, `$199.99`) ─────────
+function OfficialPricingGrid() {
+  return (
+    <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
+      
+      {/* ── Tier 1: Monthly `$19.99` ── */}
+      <motion.div whileHover={{ y: -8, scale: 1.015 }} transition={{ type: "spring", stiffness: 350, damping: 25 }} className="h-full">
+        <Card className="glass-titanium rounded-3xl overflow-hidden shadow-xl h-full flex flex-col">
+          <CardContent className="p-8 flex flex-col h-full space-y-6">
+            <div className="space-y-2">
+              <span className="inline-block px-2.5 py-0.5 rounded-md bg-white/[0.02] border border-white/10 text-neutral-300 text-[10px] font-bold uppercase tracking-wider">Flexible</span>
+              <h3 className="text-2xl font-extrabold text-white">Monthly Plan</h3>
+              <p className="text-neutral-400 text-sm">Perfect for short research projects and finals week.</p>
+            </div>
+            <div className="text-5xl font-black text-white py-2">
+              $19<span className="text-3xl font-bold">.99</span><span className="text-lg text-neutral-400 font-medium">/mo</span>
+            </div>
+            <ul className="space-y-3.5 text-sm text-neutral-300 flex-1 border-t border-white/[0.08] pt-6">
+              <li className="flex items-center gap-2.5"><Check className="h-4 w-4 text-[#00e5ff] shrink-0" /> Full Chrome Extension access</li>
+              <li className="flex items-center gap-2.5"><Check className="h-4 w-4 text-[#00e5ff] shrink-0" /> Focus Document Studio (`.pdf`, `.docx`)</li>
+              <li className="flex items-center gap-2.5"><Check className="h-4 w-4 text-[#00e5ff] shrink-0" /> Spatial Karaoke word highlighting</li>
+              <li className="flex items-center gap-2.5"><Check className="h-4 w-4 text-[#00e5ff] shrink-0" /> Cancel anytime with one click</li>
+            </ul>
+            <form action={createCheckoutAction} className="w-full pt-4 mt-auto">
+              <input type="hidden" name="priceId" value="price_monthly_1999" />
+              <Button type="submit" className="w-full bg-white/5 hover:bg-white/10 text-white font-bold h-12 rounded-xl transition-transform active:scale-95 border border-white/10">
+                Start Monthly (`$19.99`)
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* ── Tier 2: 6 Months Beta `$89.99` (THE BEST VALUE) ── */}
+      <motion.div whileHover={{ y: -10, scale: 1.025 }} transition={{ type: "spring", stiffness: 350, damping: 25 }} className="relative md:-translate-y-4 z-10 h-full">
+        <div className="absolute -inset-0.5 rounded-3xl bg-gradient-to-b from-white/25 to-transparent opacity-40 blur-md" />
+        
+        <Card className="relative glass-titanium border border-white/25 rounded-3xl h-full flex flex-col shadow-[0_20px_50px_rgba(0,0,0,0.7)] overflow-hidden adhd-pulse-glow">
+          <div className="bg-gradient-to-r from-[#7c5cff] to-[#00e5ff] text-black text-xs font-black py-2.5 px-4 text-center uppercase tracking-widest border-b border-white/[0.08]">
+            🔥 MOST POPULAR — 6 MONTHS BETA (`$89.99`)
+          </div>
+          
+          <CardContent className="p-8 flex flex-col h-full space-y-6">
+            <div className="space-y-1">
+              <h3 className="text-3xl font-black text-white">6 Months Beta</h3>
+              <p className="text-neutral-400 text-sm font-semibold">Our #1 recommended tier for semester mastery.</p>
+            </div>
+            <div>
+              <div className="text-6xl font-black text-white">
+                $89<span className="text-3xl font-bold">.99</span>
+              </div>
+              <p className="text-white text-sm font-extrabold mt-2 tracking-wide">💡 Only $14.99/mo — Billed once every 6 months</p>
+              <p className="text-neutral-500 text-xs mt-0.5 line-through font-medium">$119.94 if paid monthly (Save $30 instantly)</p>
+            </div>
+            <ul className="space-y-4 text-sm text-neutral-200 flex-1 bg-white/[0.02] p-5 rounded-2xl border border-white/[0.08]">
+              <li className="flex items-center gap-3 font-semibold"><Check className="h-5 w-5 text-[#00e5ff] shrink-0" /> Everything in Monthly, plus:</li>
+              <li className="flex items-center gap-3"><Check className="h-5 w-5 text-[#00e5ff] shrink-0" /> **Priority Neural TTS Engine** queue</li>
+              <li className="flex items-center gap-3"><Check className="h-5 w-5 text-[#00e5ff] shrink-0" /> **Offline 600s Binaural Soundscape** vault</li>
+              <li className="flex items-center gap-3"><Check className="h-5 w-5 text-[#00e5ff] shrink-0" /> **Instant PDF spatial XY-cut** sorter</li>
+            </ul>
+            <form action={createCheckoutAction} className="w-full pt-4 mt-auto">
+              <input type="hidden" name="priceId" value="price_6months_8999" />
+              <Button type="submit" className="relative group w-full bg-white hover:bg-neutral-200 text-black font-black text-base h-14 rounded-xl shadow-[0_4px_20px_rgba(255,255,255,0.15)] transition-transform active:scale-95">
+                <span className="relative z-10 flex items-center justify-center gap-2">
+                  LOCK IN $89.99 BETA DEAL <Zap className="h-5 w-5 fill-black text-black" />
+                </span>
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* ── Tier 3: 2-Year Mastery `$199.99` ── */}
+      <motion.div whileHover={{ y: -8, scale: 1.015 }} transition={{ type: "spring", stiffness: 350, damping: 25 }} className="h-full">
+        <Card className="glass-titanium rounded-3xl overflow-hidden shadow-xl h-full flex flex-col">
+          <CardContent className="p-8 flex flex-col h-full space-y-6">
+            <div className="space-y-2">
+              <span className="inline-block px-2.5 py-0.5 rounded-md bg-white/[0.02] border border-white/10 text-neutral-300 text-[10px] font-bold uppercase tracking-wider">Maximum Savings</span>
+              <h3 className="text-2xl font-extrabold text-white">2-Year Mastery Plan</h3>
+              <p className="text-neutral-400 text-sm">For degree programs and career deep work.</p>
+            </div>
+            <div className="text-5xl font-black text-white py-2">
+              $199<span className="text-3xl font-bold">.99</span>
+            </div>
+            <p className="text-white text-sm font-extrabold -mt-3 tracking-wide">💡 Only $8.33/mo — Billed once for 2 full years</p>
+            <p className="text-neutral-500 text-xs line-through">$479.76 if paid monthly (Save $280 instantly)</p>
+            <ul className="space-y-3.5 text-sm text-neutral-300 flex-1 border-t border-white/[0.08] pt-6">
+              <li className="flex items-center gap-2.5"><Check className="h-4 w-4 text-[#00e5ff] shrink-0" /> All VIP features & early feature betas</li>
+              <li className="flex items-center gap-2.5"><Check className="h-4 w-4 text-[#00e5ff] shrink-0" /> Unlimited Cloud Study Vault storage</li>
+              <li className="flex items-center gap-2.5"><Check className="h-4 w-4 text-[#00e5ff] shrink-0" /> Dedicated VIP audio processing node</li>
+              <li className="flex items-center gap-2.5"><Check className="h-4 w-4 text-[#00e5ff] shrink-0" /> Lock in this founder price forever</li>
+            </ul>
+            <form action={createCheckoutAction} className="w-full pt-4 mt-auto">
+              <input type="hidden" name="priceId" value="price_2years_19999" />
+              <Button type="submit" className="w-full bg-white/5 hover:bg-white/10 text-white font-bold h-12 rounded-xl border border-white/10 transition-transform active:scale-95">
+                Claim 2-Year Plan (`$199.99`)
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+    </div>
+  );
+}
+
+// ─── Us vs Them Comparison Matrix ──────────────────────────────────────────────
+function ComparisonMatrix() {
+  return (
+    <motion.section
+      className="mt-32 w-full max-w-5xl mx-auto px-4 flex flex-col items-center"
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.8 }}
+    >
+      <div className="text-center mb-12 space-y-2">
+        <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">Why cobble together 3 apps when you can use 1?</h2>
+        <p className="text-neutral-400 text-base">We combined document parsing, bionic formatting, and binaural soundscapes into one studio.</p>
+      </div>
+
+      <div className="w-full overflow-x-auto rounded-3xl glass-titanium shadow-2xl">
+        <table className="w-full text-left border-collapse min-w-[650px]">
+          <thead>
+            <tr>
+              <th className="p-6 border-b border-white/[0.08] text-neutral-400 font-semibold text-sm">Capability / Dimension</th>
+              <th className="p-6 border-b border-white/[0.08] bg-white/[0.04] text-white font-extrabold border-x border-x-white/[0.08] text-center w-1/4 text-base">
+                Hyperfi Studio
+              </th>
+              <th className="p-6 border-b border-white/[0.08] text-neutral-400 font-medium text-center w-1/4">
+                Generic TTS Apps<br/><span className="text-xs text-neutral-500 font-normal">(Speechify / NaturalReader)</span>
+              </th>
+              <th className="p-6 border-b border-white/[0.08] text-neutral-400 font-medium text-center w-1/4">
+                Music & Focus Apps<br/><span className="text-xs text-neutral-500 font-normal">(Brain.fm / Endel)</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody className="text-sm">
+            <tr className="border-b border-white/5">
+              <td className="p-6 text-white font-medium">Spatial XY-Cut Double-Column PDF Parsing</td>
+              <td className="p-6 bg-white/[0.02] border-x border-x-white/5 text-center"><CheckCircle2 className="h-5 w-5 mx-auto text-[#00e5ff]" /></td>
+              <td className="p-6 text-center"><XCircle className="h-5 w-5 mx-auto text-neutral-600" /></td>
+              <td className="p-6 text-center"><XCircle className="h-5 w-5 mx-auto text-neutral-600" /></td>
+            </tr>
+            <tr className="border-b border-white/5">
+              <td className="p-6 text-white font-medium">600s Equal-Power Crossfaded Binaural Audio</td>
+              <td className="p-6 bg-white/[0.02] border-x border-x-white/5 text-center"><CheckCircle2 className="h-5 w-5 mx-auto text-[#00e5ff]" /></td>
+              <td className="p-6 text-center"><XCircle className="h-5 w-5 mx-auto text-neutral-600" /></td>
+              <td className="p-6 text-center"><CheckCircle2 className="h-5 w-5 mx-auto text-neutral-400" /></td>
+            </tr>
+            <tr className="border-b border-white/5">
+              <td className="p-6 text-white font-medium">Monotonic Scrubbing & AbortController Race Immunity</td>
+              <td className="p-6 bg-white/[0.02] border-x border-x-white/5 text-center"><CheckCircle2 className="h-5 w-5 mx-auto text-[#00e5ff]" /></td>
+              <td className="p-6 text-center"><XCircle className="h-5 w-5 mx-auto text-neutral-600" /></td>
+              <td className="p-6 text-center"><XCircle className="h-5 w-5 mx-auto text-neutral-600" /></td>
+            </tr>
+            <tr className="border-b border-white/5">
+              <td className="p-6 text-white font-medium">Bionic Reading Anchor Formatting</td>
+              <td className="p-6 bg-white/[0.02] border-x border-x-white/5 text-center"><CheckCircle2 className="h-5 w-5 mx-auto text-[#00e5ff]" /></td>
+              <td className="p-6 text-center"><XCircle className="h-5 w-5 mx-auto text-neutral-600" /></td>
+              <td className="p-6 text-center"><XCircle className="h-5 w-5 mx-auto text-neutral-600" /></td>
+            </tr>
+            <tr>
+              <td className="p-6 text-white font-extrabold">Price & Value</td>
+              <td className="p-6 bg-white/[0.04] border-x border-x-white/10 text-center text-white font-black text-base">$14.99 / mo<br/><span className="text-[11px] font-normal text-neutral-400">(on 6-month beta plan)</span></td>
+              <td className="p-6 text-center text-neutral-400">$19.99+ / mo</td>
+              <td className="p-6 text-center text-neutral-400">$9.99 / mo</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </motion.section>
+  );
+}
+
+// ─── Demo Player ───────────────────────────────────────────────────────────────
+function DemoPlayer() {
+  const demoText = "Attention-Deficit/Hyperactivity Disorder is not a deficit of attention, but rather an issue of regulating it. People with ADHD can actually focus intensely on tasks that provide high dopamine and immediate feedback, a state known as hyperfocus. By stripping away distractions, increasing reading speed, and layering a mathematically perfect brown noise floor, Hyperfi acts as a digital stimulant, artificially inducing flow state and tricking the brain into absorbing dense information effortlessly.";
+  
+  return (
+    <motion.section
+      className="mt-32 w-full max-w-4xl flex flex-col items-center px-4"
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.8 }}
+    >
+      <div className="text-center mb-10 space-y-2">
+        <h2 className="text-3xl font-extrabold tracking-tight text-white">Experience Full Karaoke TTS</h2>
+        <p className="text-neutral-400 text-sm">Hit play below to see the precise word timing engine in action.</p>
       </div>
       
-      <div className="w-full max-w-3xl bg-[#080a0c] p-1 rounded-2xl border border-white/5 shadow-2xl relative">
-        <div className="absolute -inset-1 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-2xl blur-lg opacity-50"></div>
-        <div className="relative z-10 bg-[#0b0d10] rounded-2xl border border-white/5 p-4 sm:p-6 shadow-[0_0_40px_rgba(0,0,0,0.8)]">
+      <div className="w-full glass-titanium p-1.5 rounded-3xl shadow-2xl relative">
+        <div className="absolute -inset-0.5 bg-gradient-to-br from-white/10 to-transparent rounded-3xl blur opacity-30"></div>
+        <div className="relative z-10 glass-titanium rounded-3xl p-6 sm:p-8 shadow-inner">
           <KaraokePlayer 
             src="/demo.mp3" 
             text={demoText}
@@ -309,434 +880,3 @@ function DemoPlayer() {
     </motion.section>
   );
 }
-
-// ─── Pricing Slider ────────────────────────────────────────────────────────────
-function PricingSlider() {
-  const [activeIdx, setActiveIdx] = useState(0);
-  const x = useMotionValue(0);
-  const CARD_W = 384; // max-w-sm = 24rem = 384px
-
-  const snapTo = (idx: number) => {
-    setActiveIdx(idx);
-    animate(x, -idx * CARD_W, { type: "spring", stiffness: 320, damping: 32 });
-  };
-
-  const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    if (info.velocity.x < -300 || info.offset.x < -(CARD_W / 3)) snapTo(1);
-    else if (info.velocity.x > 300 || info.offset.x > (CARD_W / 3)) snapTo(0);
-    else snapTo(activeIdx);
-  };
-
-  return (
-    <div className="flex flex-col items-center gap-5 w-full">
-      {/* Viewport */}
-      <div className="overflow-hidden w-full max-w-sm rounded-2xl">
-        <motion.div
-          className="flex"
-          drag="x"
-          style={{ x }}
-          dragConstraints={{ left: -CARD_W, right: 0 }}
-          dragElastic={0.08}
-          onDragEnd={handleDragEnd}
-        >
-          {/* ── Card 1: Monthly ── */}
-          <div className="w-full max-w-sm flex-shrink-0 p-1">
-            <div className="relative flex justify-center items-center rounded-2xl">
-              {/* Rainbow aura — static pulse, no rotation */}
-              <motion.div
-                className="absolute rounded-3xl pointer-events-none"
-                style={{
-                  width: "145%", height: "145%",
-                  background: "conic-gradient(from 45deg, #6366f1, #8b5cf6, #ec4899, #f43f5e, #f59e0b, #22c55e, #22d3ee, #3b82f6, #6366f1)",
-                  filter: "blur(32px)",
-                }}
-                animate={{ scale: [1, 1.12, 1], opacity: [0.55, 0.85, 0.55] }}
-                transition={{ duration: 3.5, ease: "easeInOut", repeat: Infinity }}
-              />
-              <Card className="relative w-full bg-[#0e1012] border-0 rounded-2xl overflow-hidden">
-                <CardContent className="p-8 flex flex-col items-center space-y-5">
-                  <motion.div
-                    animate={{ scale: [1, 1.18, 1], opacity: [0.8, 1, 0.8] }}
-                    transition={{ duration: 2.4, ease: "easeInOut", repeat: Infinity }}
-                  >
-                    <Brain className="h-10 w-10 text-indigo-400" />
-                  </motion.div>
-                  <div className="space-y-1 text-center">
-                    <span className="inline-block px-2 py-0.5 rounded bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-[10px] font-bold uppercase tracking-wider mb-1">Beta Price</span>
-                    <h3 className="text-xl font-bold text-white">Monthly</h3>
-                    <p className="text-neutral-400 text-sm">100,000 characters/mo. Cancel anytime.</p>
-                  </div>
-                  <div className="text-5xl font-black text-white">
-                    $19<span className="text-2xl">.99</span><span className="text-xl text-neutral-500 font-normal">/mo</span>
-                  </div>
-                  <form action={createCheckoutAction} className="w-full pt-2">
-                    <CheckoutButton label="Start Monthly" />
-                  </form>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-
-          {/* ── Card 2: 6-Month Deal (hidden, slide left to reveal) ── */}
-          <div className="w-full max-w-sm flex-shrink-0 p-1">
-            <div className="relative flex justify-center items-center rounded-2xl">
-              {/* Gold/amber aura */}
-              <motion.div
-                className="absolute rounded-3xl pointer-events-none"
-                style={{
-                  width: "145%", height: "145%",
-                  background: "conic-gradient(from 45deg, #f59e0b, #f97316, #ef4444, #f59e0b, #fbbf24, #f97316, #f59e0b)",
-                  filter: "blur(32px)",
-                }}
-                animate={{ scale: [1, 1.14, 1], opacity: [0.5, 0.9, 0.5] }}
-                transition={{ duration: 3.0, ease: "easeInOut", repeat: Infinity }}
-              />
-              <Card className="relative w-full bg-[#0e1012] border-0 rounded-2xl overflow-hidden">
-                {/* Best Value badge */}
-                <div className="absolute top-0 inset-x-0 flex justify-center">
-                  <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-black text-xs font-black px-4 py-1 rounded-b-lg tracking-wide">
-                    BEST VALUE — SAVE 40%
-                  </div>
-                </div>
-                <CardContent className="pt-10 pb-8 px-8 flex flex-col items-center space-y-5">
-                  <motion.div
-                    animate={{ scale: [1, 1.2, 1], opacity: [0.8, 1, 0.8] }}
-                    transition={{ duration: 2.0, ease: "easeInOut", repeat: Infinity }}
-                  >
-                    <Zap className="h-10 w-10 text-amber-400" />
-                  </motion.div>
-                  <div className="space-y-1 text-center">
-                    <span className="inline-block px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-bold uppercase tracking-wider mb-1">Beta Price</span>
-                    <h3 className="text-xl font-bold text-white">6 Months</h3>
-                    <p className="text-neutral-400 text-sm">Unlimited focus. One payment. Zero regrets.</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-5xl font-black text-white">
-                      $89<span className="text-2xl">.99</span>
-                    </div>
-                    <p className="text-amber-400 text-sm font-medium mt-1">$15/mo — 6 months billed once</p>
-                    <p className="text-neutral-600 text-xs mt-0.5 line-through">$119.94 if paid monthly</p>
-                  </div>
-                  <form action={createCheckoutAction} className="w-full pt-2">
-                    <CheckoutButton label="Lock In the Deal" />
-                  </form>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Dot indicators + hint */}
-      <div className="flex flex-col items-center gap-2">
-        <div className="flex items-center gap-3">
-          <button onClick={() => snapTo(0)} aria-label="Monthly plan" className={`h-2 rounded-full transition-all duration-300 ${activeIdx === 0 ? "w-6 bg-indigo-500" : "w-2 bg-white/20 hover:bg-white/40"}`} />
-          <button onClick={() => snapTo(1)} aria-label="6-month plan" className={`h-2 rounded-full transition-all duration-300 ${activeIdx === 1 ? "w-6 bg-amber-500" : "w-2 bg-white/20 hover:bg-white/40"}`} />
-        </div>
-        {activeIdx === 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex items-center gap-1 text-xs text-neutral-600"
-          >
-            <ChevronLeft className="h-3 w-3" />
-            swipe left for best deal
-          </motion.div>
-        )}
-        {activeIdx === 1 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex items-center gap-1 text-xs text-neutral-600"
-          >
-            swipe right for monthly
-            <ChevronRight className="h-3 w-3" />
-          </motion.div>
-        )}
-        <p className="text-xs text-neutral-600 mt-1">🔒 Beta pricing — locks in your rate for life</p>
-      </div>
-    </div>
-  );
-}
-
-// ─── Psychological Redesign Components ────────────────────────────────────────
-
-function HeroInteractiveHook() {
-  const [text, setText] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  const handleHook = () => {
-    if (!text) return;
-    setIsProcessing(true);
-    setTimeout(() => {
-      // Simulate quick processing then force signup modal open
-      const btn = document.getElementById("hidden-signup-btn");
-      if (btn) btn.click();
-      setIsProcessing(false);
-    }, 1200);
-  };
-
-  return (
-    <div className="w-full max-w-lg mx-auto mt-6">
-      <div className="relative group">
-        <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
-        <div className="relative flex flex-col sm:flex-row items-center gap-2 p-2 bg-[#0b0d10]/80 border border-white/10 rounded-2xl backdrop-blur-xl shadow-2xl">
-          <input
-            type="text"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Paste a boring paragraph here..."
-            className="flex-1 bg-transparent border-none text-white placeholder-neutral-500 focus:ring-0 px-4 py-3 sm:py-2 outline-none text-sm w-full"
-            onKeyDown={(e) => e.key === "Enter" && handleHook()}
-          />
-          <Button
-            onClick={handleHook}
-            disabled={isProcessing || !text}
-            className="w-full sm:w-auto rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold h-12 sm:h-10 px-6 whitespace-nowrap transition-all shadow-[0_0_20px_rgba(99,102,241,0.4)] hover:shadow-[0_0_30px_rgba(99,102,241,0.6)]"
-          >
-            {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : (
-              <span className="flex items-center gap-2">
-                Make it Dopamine <ArrowRight className="h-4 w-4" />
-              </span>
-            )}
-          </Button>
-          <div className="hidden">
-            <SignUpButton mode="modal" fallbackRedirectUrl="/onboarding">
-              <button id="hidden-signup-btn">hidden</button>
-            </SignUpButton>
-          </div>
-        </div>
-      </div>
-      <p className="text-xs text-neutral-500 mt-3 text-center">
-        Try it free. No credit card required.
-      </p>
-    </div>
-  );
-}
-
-function PainSection() {
-  return (
-    <motion.section 
-      className="mt-32 w-full max-w-4xl px-4 flex flex-col items-center"
-      initial={{ opacity: 0, y: 24 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-100px" }}
-      transition={{ duration: 0.8 }}
-    >
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center bg-white/[0.02] border border-red-500/10 rounded-3xl p-8 md:p-12 shadow-2xl">
-        <div className="space-y-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold uppercase tracking-wider">
-            <Clock className="h-3 w-3" /> The Cost of Drifting
-          </div>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
-            You are wasting <span className="text-red-400">14 hours a week</span> re-reading things your brain refuses to absorb.
-          </h2>
-          <p className="text-neutral-400 text-lg leading-relaxed">
-            That is a part-time job you aren't getting paid for. Every time your eyes scan a page but your mind is somewhere else, you lose momentum, energy, and time you can never get back.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4">
-          <Card className="bg-[#080a0c] border-white/5 shadow-inner">
-            <CardContent className="p-5 flex items-center gap-4">
-              <div className="h-10 w-10 rounded-full bg-red-500/10 flex items-center justify-center shrink-0">
-                <XCircle className="h-5 w-5 text-red-400" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-white">Traditional Reading</p>
-                <p className="text-xs text-neutral-500 mt-1">High friction, low retention, easy to abandon.</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-[#080a0c] border-indigo-500/20 shadow-[0_0_20px_rgba(99,102,241,0.1)]">
-            <CardContent className="p-5 flex items-center gap-4">
-              <div className="h-10 w-10 rounded-full bg-indigo-500/20 flex items-center justify-center shrink-0">
-                <Brain className="h-5 w-5 text-indigo-400" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-white">FocusReader</p>
-                <p className="text-xs text-neutral-500 mt-1">Optimized audio delivery for immediate flow state.</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    </motion.section>
-  );
-}
-
-function AuthorityBanner() {
-  return (
-    <div className="w-full border-y border-white/5 bg-white/[0.01] py-8 my-20 flex flex-col items-center justify-center">
-      <p className="text-xs font-bold uppercase tracking-widest text-neutral-500 mb-6 flex items-center gap-2">
-        <ShieldCheck className="h-4 w-4" /> Trusted by 10,000+ students and professionals at
-      </p>
-      <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-40 grayscale select-none">
-        {/* Mocked logos using text for now to simulate the aesthetic */}
-        <span className="text-xl font-black font-serif">HARVARD</span>
-        <span className="text-xl font-bold font-sans">STANFORD</span>
-        <span className="text-xl font-black italic tracking-tighter">MIT</span>
-        <span className="text-xl font-black font-serif">Yale</span>
-        <span className="text-xl font-bold tracking-widest">NYU</span>
-      </div>
-    </div>
-  );
-}
-
-function DecoyPricing() {
-  return (
-    <div className="w-full max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch px-4">
-      {/* ── Tier 1: Monthly ── */}
-      <Card className="bg-[#0b0d10] border-white/10 flex flex-col transition-all duration-300 hover:border-white/20">
-        <CardContent className="p-8 flex flex-col h-full space-y-6">
-          <div className="space-y-2">
-            <h3 className="text-xl font-bold text-white">Monthly</h3>
-            <p className="text-neutral-500 text-sm">For short-term projects.</p>
-          </div>
-          <div className="text-4xl font-black text-white">
-            $29<span className="text-xl text-neutral-500 font-normal">/mo</span>
-          </div>
-          <ul className="space-y-3 text-sm text-neutral-300 flex-1 mt-4">
-            <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-indigo-400" /> 100,000 chars/month</li>
-            <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-indigo-400" /> All premium voices</li>
-            <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-indigo-400" /> Cancel anytime</li>
-          </ul>
-          <form action={createCheckoutAction} className="w-full pt-4 mt-auto">
-            <Button type="submit" className="w-full bg-white/10 hover:bg-white/20 text-white font-semibold h-11">
-              Start Monthly
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      {/* ── Tier 2: 6 Months (The Irrational Steal) ── */}
-      <div className="relative md:-translate-y-8 md:scale-105 z-10 mt-6 md:mt-0">
-        <div className="absolute -inset-1 rounded-2xl bg-[linear-gradient(45deg,theme(colors.indigo.500),theme(colors.violet.500),theme(colors.cyan.400),theme(colors.indigo.500))] bg-[length:200%_auto] animate-[rainbow_4s_linear_infinite] opacity-60 blur-lg"></div>
-        
-        {/* Badge moved outside the Card so overflow-hidden doesn't clip it */}
-        <div className="absolute top-0 inset-x-0 flex justify-center -translate-y-1/2 z-50">
-          <span className="bg-[#111] border border-indigo-500/50 text-indigo-300 text-[10px] sm:text-xs font-black px-6 py-2 rounded-full tracking-[0.15em] shadow-[0_0_20px_rgba(99,102,241,0.4)] flex items-center gap-2">
-            <Zap className="h-4 w-4 fill-indigo-400 text-indigo-400" /> BEST VALUE — SAVE 40% <Zap className="h-4 w-4 fill-indigo-400 text-indigo-400" />
-          </span>
-        </div>
-
-        <Card className="relative bg-[#0b0d10] border border-indigo-500/30 h-full flex flex-col shadow-[0_0_40px_rgba(99,102,241,0.15)] overflow-hidden">
-          {/* Shine effect overlay */}
-          <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-transparent to-transparent opacity-50 pointer-events-none"></div>
-          
-          <CardContent className="p-8 flex flex-col h-full space-y-6 pt-12">
-            <div className="space-y-2 text-center">
-              <h3 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-200 to-violet-300 drop-shadow-sm">6 Months</h3>
-              <p className="text-neutral-400 text-sm font-bold">Unlimited focus. Zero regrets.</p>
-            </div>
-            <div className="text-center relative">
-              <div className="text-6xl font-black text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">$69<span className="text-3xl text-neutral-400">.99</span></div>
-              <div className="absolute -right-2 top-0 rotate-6 border border-indigo-500/50 bg-indigo-500/10 text-indigo-300 text-[10px] font-black px-2 py-1 rounded-md shadow-lg backdrop-blur-md">STEAL</div>
-              <p className="text-indigo-400 text-sm font-bold mt-3 tracking-wide">$11.67/mo — billed once</p>
-              <p className="text-neutral-600 text-xs mt-1 line-through font-medium">$174 if paid monthly</p>
-            </div>
-            <ul className="space-y-4 text-sm text-neutral-200 flex-1 mt-6 bg-[#131619]/50 p-5 rounded-2xl border border-white/5">
-              <li className="flex items-center gap-3"><CheckCircle2 className="h-5 w-5 text-indigo-400" /> <strong>600,000</strong> total chars</li>
-              <li className="flex items-center gap-3"><CheckCircle2 className="h-5 w-5 text-indigo-400" /> Highest priority queue</li>
-              <li className="flex items-center gap-3"><CheckCircle2 className="h-5 w-5 text-indigo-400" /> Hyperfocus Vault included</li>
-            </ul>
-            <form action={createCheckoutAction} className="w-full pt-6 mt-auto">
-              <Button type="submit" className="relative group w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black text-lg h-14 rounded-xl shadow-[0_0_25px_rgba(99,102,241,0.4)] transition-all overflow-hidden border border-indigo-400/20">
-                <span className="relative z-10 flex items-center justify-center gap-2">
-                  UNLOCK HYPERFOCUS <Zap className="h-5 w-5 fill-white/80 text-transparent" />
-                </span>
-                <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ── Tier 3: The Decoy ── */}
-      <Card className="bg-[#080a0c] border-white/5 flex flex-col opacity-60 hover:opacity-100 transition-opacity duration-300">
-        <CardContent className="p-8 flex flex-col h-full space-y-6">
-          <div className="space-y-2">
-            <h3 className="text-xl font-bold text-neutral-400">Therapy / Tutoring</h3>
-            <p className="text-neutral-600 text-sm">The traditional cost of ADHD.</p>
-          </div>
-          <div className="text-4xl font-black text-neutral-500">
-            $150<span className="text-xl text-neutral-600 font-normal">/hr</span>
-          </div>
-          <ul className="space-y-3 text-sm text-neutral-500 flex-1 mt-4">
-            <li className="flex items-center gap-2"><XCircle className="h-4 w-4 text-red-900/50" /> High friction</li>
-            <li className="flex items-center gap-2"><XCircle className="h-4 w-4 text-red-900/50" /> Expensive over time</li>
-            <li className="flex items-center gap-2"><XCircle className="h-4 w-4 text-red-900/50" /> Not available at 2 AM</li>
-          </ul>
-          <div className="w-full pt-4 mt-auto">
-            <Button disabled className="w-full bg-white/5 text-neutral-600 font-semibold h-11 border border-white/5">
-              Not Recommended
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function ComparisonMatrix() {
-  return (
-    <motion.section
-      className="mt-32 w-full max-w-5xl px-4 flex flex-col items-center"
-      initial={{ opacity: 0, y: 24 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.8 }}
-    >
-      <div className="text-center mb-12 space-y-2">
-        <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">The ADHD Tool Landscape</h2>
-        <p className="text-neutral-400 text-sm sm:text-base">Why cobble together 3 apps when you can use 1?</p>
-      </div>
-
-      <div className="w-full overflow-x-auto rounded-2xl border border-white/10 bg-[#0b0d10] shadow-2xl">
-        <table className="w-full text-left border-collapse min-w-[600px]">
-          <thead>
-            <tr>
-              <th className="p-6 border-b border-white/10 text-neutral-400 font-medium">Feature</th>
-              <th className="p-6 border-b border-white/10 bg-indigo-500/10 text-indigo-300 font-bold border-x border-x-indigo-500/20 text-center w-1/4">FocusReader</th>
-              <th className="p-6 border-b border-white/10 text-neutral-500 font-medium text-center w-1/4">Generic TTS Apps<br/><span className="text-xs text-neutral-600 font-normal">(e.g. Speechify)</span></th>
-              <th className="p-6 border-b border-white/10 text-neutral-500 font-medium text-center w-1/4">Focus Music Apps<br/><span className="text-xs text-neutral-600 font-normal">(e.g. Brain.fm)</span></th>
-            </tr>
-          </thead>
-          <tbody className="text-sm">
-            <tr className="border-b border-white/5">
-              <td className="p-6 text-white font-medium">Reads your documents</td>
-              <td className="p-6 bg-indigo-500/5 border-x border-x-indigo-500/10 text-center"><CheckCircle2 className="h-5 w-5 mx-auto text-indigo-400" /></td>
-              <td className="p-6 text-center"><CheckCircle2 className="h-5 w-5 mx-auto text-neutral-500" /></td>
-              <td className="p-6 text-center"><XCircle className="h-5 w-5 mx-auto text-neutral-700" /></td>
-            </tr>
-            <tr className="border-b border-white/5">
-              <td className="p-6 text-white font-medium">Built-in Brown Noise Floor</td>
-              <td className="p-6 bg-indigo-500/5 border-x border-x-indigo-500/10 text-center"><CheckCircle2 className="h-5 w-5 mx-auto text-indigo-400" /></td>
-              <td className="p-6 text-center"><XCircle className="h-5 w-5 mx-auto text-neutral-700" /></td>
-              <td className="p-6 text-center"><CheckCircle2 className="h-5 w-5 mx-auto text-neutral-500" /></td>
-            </tr>
-            <tr className="border-b border-white/5">
-              <td className="p-6 text-white font-medium">Zero-Friction Interface</td>
-              <td className="p-6 bg-indigo-500/5 border-x border-x-indigo-500/10 text-center"><CheckCircle2 className="h-5 w-5 mx-auto text-indigo-400" /></td>
-              <td className="p-6 text-center"><XCircle className="h-5 w-5 mx-auto text-neutral-700" /></td>
-              <td className="p-6 text-center"><CheckCircle2 className="h-5 w-5 mx-auto text-neutral-500" /></td>
-            </tr>
-            <tr className="border-b border-white/5">
-              <td className="p-6 text-white font-medium">Price</td>
-              <td className="p-6 bg-indigo-500/10 border-x border-x-indigo-500/20 text-center text-white font-bold">$11.67 / mo</td>
-              <td className="p-6 text-center text-neutral-500">~$11.58 / mo</td>
-              <td className="p-6 text-center text-neutral-500">~$6.99 / mo</td>
-            </tr>
-            <tr>
-              <td className="p-6 text-white font-medium">Total Cost to Focus</td>
-              <td className="p-6 bg-indigo-500/10 border-x border-x-indigo-500/20 text-center text-indigo-300 font-black text-lg">$11.67</td>
-              <td className="p-6 text-center text-neutral-500" colSpan={2}>
-                $18.57 / mo <br/><span className="text-xs font-normal text-neutral-600">(if you buy both)</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </motion.section>
-  );
-}
-
