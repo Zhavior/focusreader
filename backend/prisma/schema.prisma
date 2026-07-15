@@ -1,0 +1,104 @@
+// Hyperfi Voice Agent & Document Studio - Production Prisma Schema
+// Supports PostgreSQL (Cloud/Supabase/Neon) and SQLite (Local fallback).
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id               String            @id // Clerk User ID
+  email            String            @unique
+  subscriptionTier String            @default("free") // 'free' | 'pro' | 'enterprise'
+  creditsRemaining Int               @default(10000)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  documents        Document[]
+  readingProgress  ReadingProgress[]
+  studyNotes       StudyNote[]
+  creditLedger     CreditLedger[]
+}
+
+model Document {
+  id              String            @id @default(uuid())
+  userId          String
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title           String
+  fileUrl         String? // Cloudflare R2 / S3 / GCS URL
+  docType         String            @default("pdf") // 'pdf' | 'docx' | 'txt' | 'web'
+  totalPages      Int               @default(1)
+  totalWords      Int               @default(0)
+  status          String            @default("ready") // 'extracting' | 'ready' | 'error'
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  chunks          DocumentChunk[]
+  readingProgress ReadingProgress[]
+  studyNotes      StudyNote[]
+
+  @@index([userId, updatedAt])
+}
+
+model DocumentChunk {
+  id              String   @id @default(uuid())
+  documentId      String
+  document        Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  chunkIdx        Int
+  pageIdx         Int      @default(1)
+  text            String   @db.Text
+  startWordIdx    Int      @default(0)
+  endWordIdx      Int      @default(0)
+  wordTokensJson  String   @db.Text // Precomputed acoustic weights & char boundaries
+  createdAt       DateTime @default(now())
+
+  @@unique([documentId, chunkIdx])
+  @@index([documentId])
+}
+
+model ReadingProgress {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documentId    String
+  document      Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  currentPage   Int      @default(1)
+  currentChunk  Int      @default(0)
+  activeWordIdx Int      @default(0)
+  bionicMode    Boolean  @default(true)
+  speed         Float    @default(1.0)
+  voiceId       String   @default("en-US-JennyNeural")
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, documentId])
+  @@index([userId])
+}
+
+model StudyNote {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  pageIdx    Int      @default(1)
+  noteText   String   @db.Text
+  quoteText  String?  @db.Text
+  createdAt  DateTime @default(now())
+
+  @@index([userId, documentId])
+}
+
+model CreditLedger {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  delta     Int      // Negative for synthesis usage, positive for top-ups
+  reason    String   // 'synthesis' | 'monthly_refill' | 'bonus'
+  reference String?
+  createdAt DateTime @default(now())
+
+  @@unique([reason, reference])
+  @@index([userId])
+}

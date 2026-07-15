@@ -1,0 +1,19 @@
+{
+  "name": "voice-agent-ecosystem",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "npm --workspace=frontend run dev",
+    "build": "npm --workspace=frontend run build",
+    "start": "npm --workspace=frontend run start",
+    "lint": "npm --workspace=frontend run lint"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.11.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

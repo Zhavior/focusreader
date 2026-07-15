@@ -17,7 +17,7 @@ export async function OPTIONS() {
 
 /**
  * POST /api/extension-vault
- * Allows the Zhavior Chrome Extension to save a webpage article (URL, Title, Clean Text)
+ * Allows the Hyperfi Chrome Extension to save a webpage article (URL, Title, Clean Text)
  * directly into the user's permanent Dashboard Study Library (TrackLibrary).
  */
 export async function POST(req: Request) {

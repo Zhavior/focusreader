@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
         emptyDiv.innerHTML = `
           <div class="empty-icon">📚</div>
           <h3>Your reading library is empty</h3>
-          <p>When you launch Zhavior FocusReader on any article or website across the web, it will automatically be collected right here so you can revisit, organize, and favorite your top reads.</p>
+          <p>When you launch Hyperfi Reader on any article or website across the web, it will automatically be collected right here so you can revisit, organize, and favorite your top reads.</p>
         `;
       }
       cardsGrid.appendChild(emptyDiv);

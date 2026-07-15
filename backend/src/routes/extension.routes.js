@@ -1,92 +1,36 @@
 const { Router } = require("express");
 const crypto = require("crypto");
-const path = require("path");
-const Database = require("better-sqlite3");
-
-const { buildSpeechScript } = require("../services/chunker.service");
-const { streamChunkAudio, ElevenLabsError } = require("../services/elevenlabs.service");
-const { synthesizeChunk, isLocalProviderEnabled, LocalTtsError } = require("../services/localTts.service");
-const { synthesizeOpenSourceChunk, isOpenSourceProviderEnabled, OpenSourceTtsError } = require("../services/openSourceTts.service");
-const { asyncHandler } = require("../utils/asyncHandler");
+const { extensionAuth } = require("../middleware/extensionAuth");
 const { ttsRateLimiter } = require("../middleware/rateLimiter");
+const { synthesizeOrchestrated } = require("../services/ttsOrchestrator.service");
+const { getBalance, spendCreditsAtomic } = require("../services/db.service");
+const { asyncHandler } = require("../utils/asyncHandler");
+const { InvalidInputError } = require("../utils/errors");
 
 const router = Router();
-
-// ---------------------------------------------------------------------------
-// SQLite — open the same DB the Next.js frontend uses.
-// Path must match frontend/lib/db.ts  DATA_DIR / focusreader.db
-// ---------------------------------------------------------------------------
-const DB_PATH =
-  process.env.DATA_DIR
-    ? path.join(process.env.DATA_DIR, "focusreader.db")
-    : path.join(__dirname, "../../../frontend/data/focusreader.db");
-
-let _db = null;
-function getDb() {
-  if (!_db) {
-    _db = new Database(DB_PATH);
-    _db.pragma("busy_timeout = 3000"); // Next.js writes to the same WAL db
-  }
-  return _db;
-}
-
-// ---------------------------------------------------------------------------
-// Credit metering — mirrors frontend/lib/db.ts spendCredits(): atomic
-// check-and-insert in one transaction, so this route can never hand out
-// unmetered audio. Balance is SUM(delta) over the append-only ledger.
-// ---------------------------------------------------------------------------
-function getBalance(userId) {
-  const row = getDb()
-    .prepare("SELECT COALESCE(SUM(delta), 0) AS balance FROM credit_ledger WHERE user_id = ?")
-    .get(userId);
-  return row.balance;
-}
-
-function spendCredits(userId, amount, ref) {
-  const db = getDb();
-  const spend = db.transaction(() => {
-    const balance = getBalance(userId);
-    if (balance < amount) return null;
-    db.prepare(
-      "INSERT INTO credit_ledger (user_id, delta, reason, ref) VALUES (?, ?, 'spend_tts', ?)"
-    ).run(userId, -amount, ref);
-    return balance - amount;
-  });
-  return spend();
-}
-
 const MAX_TEXT_LENGTH = 200000;
 
-// ---------------------------------------------------------------------------
-// Token resolution — mirrors frontend/lib/db.ts resolveExtensionToken()
-// ---------------------------------------------------------------------------
-function resolveToken(rawToken) {
-  try {
-    const hash = crypto.createHash("sha256").update(rawToken).digest("hex");
-    const row = getDb()
-      .prepare("SELECT user_id FROM extension_tokens WHERE token_hash = ?")
-      .get(hash);
-    return row ? row.user_id : null;
-  } catch (err) {
-    console.error("[ExtRoute] DB lookup failed:", err.message);
-    return null;
-  }
-}
+// All extension routes require authentication via Bearer token
+router.use(extensionAuth);
 
 // ---------------------------------------------------------------------------
-// CORS helper — extension content scripts can run on any site
+// GET /api/extension/token
 // ---------------------------------------------------------------------------
-function cors(res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.setHeader("Access-Control-Max-Age", "86400");
-}
-
-router.options("*", (req, res) => {
-  cors(res);
-  res.sendStatus(204);
-});
+router.get(
+  "/token",
+  asyncHandler(async (req, res) => {
+    const dbService = require("../services/db.service");
+    const balance = await getBalance(req.userId);
+    res.status(200).json({
+      status: "authenticated",
+      user: {
+        id: req.userId,
+        tier: "pro",
+        credits_remaining: balance
+      }
+    });
+  })
+);
 
 // ---------------------------------------------------------------------------
 // POST /api/extension/tts
@@ -95,108 +39,49 @@ router.post(
   "/tts",
   ttsRateLimiter,
   asyncHandler(async (req, res) => {
-    cors(res);
-
-    const authHeader = req.get("Authorization") || "";
-    if (!authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "unauthorized" });
-    }
-    const userId = resolveToken(authHeader.slice(7).trim());
-    if (!userId) {
-      return res.status(401).json({
-        error: "unauthorized",
-        message: "Invalid or revoked extension token. Generate a new one in Dashboard → Tools.",
-      });
-    }
-
-    const { text } = req.body || {};
+    const { text, voiceId, voice, modelId } = req.body || {};
     if (!text || !text.trim()) {
-      return res.status(400).json({ error: "invalid_input", message: "text is required" });
+      throw new InvalidInputError("text is required");
     }
     if (text.length > MAX_TEXT_LENGTH) {
-      return res.status(400).json({ error: "invalid_input", message: `Text exceeds ${MAX_TEXT_LENGTH} characters.` });
+      throw new InvalidInputError(`Text exceeds ${MAX_TEXT_LENGTH} characters.`);
     }
 
     const cost = text.length;
-    if (getBalance(userId) < cost) {
-      return res.status(402).json({
-        error: "insufficient_credits",
-        message: "Out of credits — open Billing to upgrade.",
-      });
+    // Fast check before synthesis
+    const currentBalance = await getBalance(req.userId);
+    if (currentBalance < cost) {
+      const { InsufficientCreditsError } = require("../utils/errors");
+      throw new InsufficientCreditsError("Out of credits — open Billing to upgrade.");
     }
 
-    const useOpenSource = isOpenSourceProviderEnabled() || (req.body.voiceId && String(req.body.voiceId).startsWith("opensource_"));
-    const useLocal = !useOpenSource && isLocalProviderEnabled();
-    const voiceId = req.body.voiceId || process.env.ELEVENLABS_DEFAULT_VOICE_ID;
-    const modelId = req.body.modelId || process.env.ELEVENLABS_MODEL_ID || "eleven_multilingual_v2";
+    // Attach AbortController for stream cancellation (Day 5)
+    const abortController = new AbortController();
+    req.on("close", () => {
+      if (!res.headersSent || !res.writableFinished) {
+        abortController.abort();
+      }
+    });
 
-    if (!useOpenSource && !useLocal && !voiceId) {
-      return res.status(400).json({ error: "invalid_input", message: "No voiceId configured." });
-    }
+    // Synthesize using multi-provider orchestrator with cache support
+    const finalAudioBuffer = await synthesizeOrchestrated({
+      text,
+      voiceId,
+      voice,
+      modelId,
+      speed: 1.0,
+      signal: abortController.signal
+    });
 
-    const chunks = buildSpeechScript(text);
-    if (chunks.length === 0) {
-      return res.status(400).json({ error: "invalid_input", message: "No speakable content." });
-    }
-
-    const fetchChunk = (chunk) =>
-      useOpenSource
-        ? synthesizeOpenSourceChunk({ text: chunk, voiceId: req.body.voice || req.body.voiceId })
-        : useLocal
-          ? synthesizeChunk(chunk, req.body.voice || req.body.voiceId)
-          : streamChunkAudio({ text: chunk, voiceId, modelId, apiKey: process.env.ELEVENLABS_API_KEY });
-
-    let firstStream;
-    try {
-      firstStream = await fetchChunk(chunks[0]);
-    } catch (err) {
-      const status = err instanceof ElevenLabsError || err instanceof LocalTtsError || err instanceof OpenSourceTtsError ? (err.statusCode || 502) : 502;
-      return res.status(status).json({ error: "tts_error", message: err.message });
-    }
-
-    // Engine accepted — charge atomically (failed synthesis above costs nothing).
-    const remaining = spendCredits(userId, cost, `ext4000:${crypto.randomUUID()}`);
-    if (remaining === null) {
-      return res.status(402).json({
-        error: "insufficient_credits",
-        message: "Out of credits — open Billing to upgrade.",
-      });
-    }
+    // Deduct credits atomically after synthesis succeeds (Day 3)
+    const remaining = await spendCreditsAtomic(req.userId, cost, `ext:${crypto.randomUUID()}`);
     res.setHeader("X-Credits-Remaining", String(remaining));
+    res.setHeader("X-Credits-Deducted", String(cost));
 
     res.status(200);
     res.setHeader("Content-Type", "audio/mpeg");
-
-    if (chunks.length === 1 && Buffer.isBuffer(firstStream)) {
-      res.setHeader("Content-Length", firstStream.length);
-      return res.end(firstStream);
-    }
-
-    res.setHeader("Transfer-Encoding", "chunked");
-    res.flushHeaders();
-
-    const pipe = (stream) =>
-      new Promise((resolve, reject) => {
-        if (Buffer.isBuffer(stream)) {
-          res.write(stream);
-          return resolve();
-        }
-        stream.on("data", (d) => { if (!res.write(d)) { stream.pause(); res.once("drain", () => stream.resume()); } });
-        stream.on("end", resolve);
-        stream.on("error", reject);
-      });
-
-    try {
-      await pipe(firstStream);
-      for (let i = 1; i < chunks.length; i++) {
-        const s = await fetchChunk(chunks[i]);
-        await pipe(s);
-      }
-      res.end();
-    } catch (err) {
-      console.error("[ExtRoute] TTS stream error:", err.message);
-      res.end();
-    }
+    res.setHeader("Content-Length", finalAudioBuffer.length);
+    return res.end(finalAudioBuffer);
   })
 );
 
@@ -206,22 +91,10 @@ router.post(
 router.post(
   "/notes",
   asyncHandler(async (req, res) => {
-    cors(res);
-
-    const authHeader = req.get("Authorization") || "";
-    if (!authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "unauthorized" });
+    const { note } = req.body || {};
+    if (!note) {
+      throw new InvalidInputError("note is required");
     }
-    const userId = resolveToken(authHeader.slice(7).trim());
-    if (!userId) {
-      return res.status(401).json({ error: "unauthorized" });
-    }
-
-    const { note, source } = req.body || {};
-    if (!note) return res.status(400).json({ error: "invalid_input" });
-
-    // Notes route only reads token — it doesn't write back via this backend.
-    // For now just acknowledge; the Next.js route can handle writes.
     res.json({ ok: true, message: "Note received" });
   })
 );

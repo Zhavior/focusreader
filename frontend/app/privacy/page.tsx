@@ -1,14 +1,15 @@
 import { Brain } from "lucide-react";
 import Link from "next/link";
+import Footer from "@/components/Footer";
 
 export default function PrivacyPolicy() {
   return (
-    <div className="min-h-screen bg-[#080a0c] text-neutral-300 py-16 px-4">
-      <div className="max-w-3xl mx-auto space-y-12">
+    <div className="min-h-screen bg-[#080a0c] text-neutral-300 flex flex-col justify-between">
+      <div className="max-w-3xl mx-auto space-y-12 py-16 px-4 flex-1">
         <header className="space-y-4">
           <Link href="/" className="inline-flex items-center gap-2 text-indigo-400 hover:text-indigo-300 transition-colors">
             <Brain className="h-5 w-5" />
-            <span className="font-bold tracking-tight text-white">FocusReader</span>
+            <span className="font-bold tracking-tight text-white">Hyperfi</span>
           </Link>
           <h1 className="text-4xl font-extrabold text-white tracking-tight">Privacy Policy</h1>
           <p className="text-neutral-500">Last updated: July 2026</p>
@@ -17,7 +18,7 @@ export default function PrivacyPolicy() {
         <section className="space-y-4">
           <h2 className="text-2xl font-semibold text-white">1. Information We Collect</h2>
           <p>
-            When you use FocusReader, we collect basic account information through our authentication provider (Clerk), including your email address and profile details. If you upgrade to a premium plan, your payment information is securely processed by Stripe. We do not store full credit card numbers on our servers.
+            When you use Hyperfi, we collect basic account information through our authentication provider (Clerk), including your email address and profile details. If you upgrade to a premium plan, your payment information is securely processed by Stripe. We do not store full credit card numbers on our servers.
           </p>
         </section>
 
@@ -45,10 +46,11 @@ export default function PrivacyPolicy() {
         <section className="space-y-4">
           <h2 className="text-2xl font-semibold text-white">5. Contact Us</h2>
           <p>
-            If you have questions about this Privacy Policy, please contact us at support@focusreader.app.
+            If you have questions about this Privacy Policy, please contact us at support@hyperfi.app.
           </p>
         </section>
       </div>
+      <Footer />
     </div>
   );
 }

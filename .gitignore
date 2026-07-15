@@ -17,3 +17,16 @@ frontend/data/
 .DS_Store
 *.log
 frontend/data-backup-*/
+.vercel
+.env*
+
+# Backup & Scratch files
+*.bak
+*.bak-*
+*.backup
+*.current-backup
+*.placeholder-backup
+frontend/IDK
+*.jso
+cache/
+dist/

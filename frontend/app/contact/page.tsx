@@ -46,7 +46,7 @@ export default function ContactPage() {
         <header className="space-y-4">
           <Link href="/" className="inline-flex items-center gap-2 text-indigo-400 hover:text-indigo-300 transition-colors">
             <Brain className="h-5 w-5" />
-            <span className="font-bold tracking-tight text-white">FocusReader</span>
+            <span className="font-bold tracking-tight text-white">Hyperfi</span>
           </Link>
           <h1 className="text-4xl font-extrabold text-white tracking-tight">Contact Us</h1>
           <p className="text-neutral-500">

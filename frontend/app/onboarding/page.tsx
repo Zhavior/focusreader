@@ -274,7 +274,7 @@ export default function OnboardingPage() {
         <div className="h-6 w-6 rounded-full bg-indigo-600 flex items-center justify-center">
           <Globe className="h-3.5 w-3.5 text-white" />
         </div>
-        <span className="text-sm font-semibold text-neutral-400 tracking-tight">FocusReader</span>
+        <span className="text-sm font-semibold text-neutral-400 tracking-tight">Hyperfi</span>
       </div>
 
       {/* Step content */}

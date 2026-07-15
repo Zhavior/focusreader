@@ -78,7 +78,8 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         text: text,
-        voiceId: body.voiceId,
+        voiceId: body.voiceId || body.voice,
+        voice: body.voice || body.voiceId,
         modelId: body.modelId,
       }),
     });
@@ -106,10 +107,14 @@ export async function POST(req: Request) {
       );
     }
 
-    return new Response(upstream.body, {
+    const arrayBuffer = await upstream.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    return new Response(buffer, {
       status: 200,
       headers: {
         "Content-Type": "audio/mpeg",
+        "Content-Length": String(buffer.length),
         "Access-Control-Allow-Origin": "*",
       },
     });

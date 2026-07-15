@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { Loader2, Sparkles, Settings2, TriangleAlert } from "lucide-react";
 
-function useBillingRedirect(endpoint: string) {
+function useBillingRedirect(endpoint: string, payload?: Record<string, any>) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -11,7 +11,11 @@ function useBillingRedirect(endpoint: string) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(endpoint, { method: "POST" });
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload || {}),
+      });
       const data = await res.json();
       if (!res.ok || !data.url) {
         throw new Error(data.error || "Something went wrong.");
@@ -21,27 +25,34 @@ function useBillingRedirect(endpoint: string) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
       setLoading(false);
     }
-  }, [endpoint]);
+  }, [endpoint, payload]);
 
   return { go, loading, error };
 }
 
-export function UpgradeButton() {
-  const { go, loading, error } = useBillingRedirect("/api/billing/checkout");
+export function UpgradeButton({ label, accent, tier, priceId }: { label?: string; accent?: string; tier?: string; priceId?: string }) {
+  const { go, loading, error } = useBillingRedirect("/api/billing/checkout", { tier, priceId });
+
+  const accentClass =
+    accent === "amber"
+      ? "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black"
+      : accent === "purple"
+      ? "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white"
+      : "bg-brand hover:bg-brand-hover text-white";
 
   return (
     <div className="flex flex-col gap-2">
       <button
         onClick={go}
         disabled={loading}
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+        className={`flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${accentClass}`}
       >
         {loading ? (
           <Loader2 className="h-4 w-4 animate-spin" />
         ) : (
           <Sparkles className="h-4 w-4" />
         )}
-        {loading ? "Redirecting to checkout..." : "Upgrade to Premium"}
+        {loading ? "Redirecting to checkout..." : (label ?? "Upgrade to Premium")}
       </button>
       {error && <BillingError message={error} />}
     </div>

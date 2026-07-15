@@ -36,7 +36,7 @@ export default function VoiceDashboard() {
   }, []);
 
   const searchParams = useSearchParams();
-  const urlParam = searchParams.get('url');
+  const urlParam = searchParams?.get('url') ?? null;
 
   useEffect(() => {
     if (urlParam && !text && !isParsing) {
@@ -179,8 +179,8 @@ export default function VoiceDashboard() {
           </div>
         </div>
         <a 
-          href="/focusreader-extension.zip" 
-          download="focusreader-extension.zip"
+          href="/hyperfi-extension.zip" 
+          download="hyperfi-extension.zip"
           className="flex shrink-0 items-center gap-2 rounded-2xl bg-white px-6 py-3 text-sm font-bold text-[#0b0d10] shadow-[0_0_20px_rgba(255,255,255,0.2)] transition hover:bg-neutral-200 hover:scale-[1.02] active:scale-95 relative z-10"
         >
           <Download className="h-4 w-4" />

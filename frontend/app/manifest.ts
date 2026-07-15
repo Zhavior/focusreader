@@ -2,10 +2,10 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "FocusReader — ADHD Text to Speech",
-    short_name: "FocusReader",
+    name: "Hyperfi — High-Fidelity Focus for ADHD",
+    short_name: "Hyperfi",
     description:
-      "Turn boring PDFs and textbooks into dopamine-optimized audio tracks.",
+      "Neural-voiced audio for PDFs, articles & textbooks. Built for hyperfocus.",
     start_url: "/dashboard",
     display: "standalone",
     background_color: "#0b0d10",

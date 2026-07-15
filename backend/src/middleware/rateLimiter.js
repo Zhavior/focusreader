@@ -2,7 +2,7 @@ const rateLimit = require("express-rate-limit");
 
 const ttsRateLimiter = rateLimit({
   windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 60000,
-  max: Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 500,
+  max: Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 1000,
   standardHeaders: true,
   legacyHeaders: false,
   message: {

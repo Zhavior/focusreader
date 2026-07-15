@@ -28,8 +28,9 @@ const BACKGROUND_PRESETS = {
 };
 
 function clampSpeed(speed) {
+  if (speed === null || speed === undefined || speed === "") return 1.0;
   const n = Number(speed);
-  if (!Number.isFinite(n)) return 1.0;
+  if (!Number.isFinite(n) || n <= 0) return 1.0;
   return Math.min(3.0, Math.max(0.5, n));
 }
 
@@ -44,15 +45,18 @@ function needsProcessing(speed, background) {
 }
 
 /**
- * Runs the assembled speech (a single MP3 Buffer) through ffmpeg to apply the
- * playback speed and mix in the background bed. Returns a Readable stream of
- * the processed MP3 for piping straight to the HTTP response.
+ * Runs the assembled speech (a single MP3 Buffer or Readable stream) through ffmpeg
+ * to apply the playback speed and mix in the background bed. Returns a Readable stream
+ * of the processed MP3 for piping straight to the HTTP response.
  *
  * `amix ... normalize=0` keeps the speech at full loudness while adding the bed
  * at its own low volume; `duration=first` ties the output length to the speech
  * so the infinite lavfi bed is trimmed automatically.
+ *
+ * Supports AbortSignal (`signal`) to kill ffmpeg child processes immediately
+ * when a client disconnects, preventing memory leaks and zombie processes.
  */
-function processAudio(speechBuffer, { speed = 1.0, background = "silence" } = {}) {
+function processAudio(speechInput, { speed = 1.0, background = "silence", signal } = {}) {
   const s = clampSpeed(speed);
   const preset = BACKGROUND_PRESETS[background] || null;
 
@@ -89,15 +93,64 @@ function processAudio(speechBuffer, { speed = 1.0, background = "silence" } = {}
   ff.stderr.on("data", (d) => {
     stderr += d.toString();
   });
+
+  const cleanup = () => {
+    try {
+      if (!ff.killed) ff.kill("SIGKILL");
+    } catch (e) {}
+  };
+
+  const onAbort = () => {
+    cleanup();
+    if (!ff.stdout.destroyed) {
+      ff.stdout.destroy(new Error("Audio processing aborted by client connection close."));
+    }
+  };
+
+  if (signal) {
+    if (signal.aborted) {
+      onAbort();
+    } else {
+      signal.addEventListener("abort", onAbort);
+      ff.on("close", () => {
+        signal.removeEventListener("abort", onAbort);
+      });
+    }
+  }
+
+  ff.on("error", (err) => {
+    cleanup();
+    if (!ff.stdout.destroyed) {
+      const procErr = new Error(`ffmpeg process failure: ${err.message}`);
+      ff.stdout.emit("error", procErr);
+    }
+  });
+
   ff.on("close", (code) => {
-    if (code !== 0) {
+    if (code !== 0 && code !== null) {
+      if (signal?.aborted || ff.stdout.destroyed) return;
       console.error(`ffmpeg exited ${code}: ${stderr.slice(0, 500)}`);
+      const procErr = new Error(`ffmpeg exited with code ${code}: ${stderr.slice(0, 500)}`);
+      ff.stdout.emit("error", procErr);
     }
   });
 
   // Ignore EPIPE if ffmpeg dies before we finish writing the input.
   ff.stdin.on("error", () => {});
-  ff.stdin.end(speechBuffer);
+
+  if (speechInput && typeof speechInput.pipe === "function") {
+    speechInput.on("error", (err) => {
+      cleanup();
+      ff.stdout.emit("error", err);
+    });
+    speechInput.pipe(ff.stdin);
+  } else if (Buffer.isBuffer(speechInput) || typeof speechInput === "string") {
+    ff.stdin.end(speechInput);
+  } else if (speechInput) {
+    ff.stdin.end(Buffer.from(speechInput));
+  } else {
+    ff.stdin.end();
+  }
 
   return ff.stdout;
 }

@@ -1,15 +1,24 @@
 {
   "manifest_version": 3,
-  "name": "Zhavior FocusReader",
-  "version": "3.0.1",
+  "name": "Hyperfi Reader",
+  "version": "3.0.3",
   "description": "Read any article with hyper-focus: karaoke TTS, Bionic Reading, and focus soundscapes — built for ADHD brains.",
   "permissions": [
-    "storage"
+    "storage",
+    "offscreen",
+    "cookies"
   ],
   "host_permissions": [
     "http://localhost:3001/*",
-    "http://localhost:4000/*"
+    "http://localhost:4000/*",
+    "https://*.hyperfi.ai/*",
+    "https://*.hyperfi.app/*",
+    "https://*/*",
+    "http://*/*"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
@@ -17,7 +26,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Zhavior FocusReader",
+    "default_title": "Hyperfi Reader",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -30,14 +39,16 @@
         "<all_urls>"
       ],
       "js": [
-        "content.js"
+        "config.js",
+        "content.js",
+        "gemini-voice.js"
       ],
       "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["library.html", "icons/*"],
+      "resources": ["library.html", "offscreen.html", "icons/*"],
       "matches": ["<all_urls>"]
     }
   ]

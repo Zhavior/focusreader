@@ -1,4 +1,4 @@
-# FocusReader production stack — single VPS, one command.
+# FocusReader production stack — single VPS / Cloud orchestration.
 #
 #   cp env.production.example .env   (fill it in)
 #   docker compose up -d --build
@@ -6,34 +6,45 @@
 # Both apps share /data (SQLite ledger + audio files). Caddy terminates TLS
 # for app.<domain> and api.<domain> with automatic Let's Encrypt certs.
 services:
-  frontend:
-    build:
-      context: ../frontend
-      dockerfile: ../deploy/Dockerfile.frontend
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      DATA_DIR: /data
-      TTS_BACKEND_URL: http://backend:4000
-    volumes:
-      - appdata:/data
-    depends_on:
-      - backend
-
   backend:
     build:
       context: ../backend
       dockerfile: ../deploy/Dockerfile.backend
     restart: unless-stopped
+    user: "1000:1000"
     env_file: .env
     environment:
       DATA_DIR: /data
       TRUST_PROXY: "1"
-      # No macOS `say` on Linux: production REQUIRES ELEVENLABS_API_KEY or
-      # OPEN_SOURCE_TTS_URL in .env. Do not set TTS_PROVIDER=local here.
+      NODE_ENV: production
+      PORT: "4000"
       TTS_PROVIDER: ""
     volumes:
       - appdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:4000/health/live || exit 1"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: ../deploy/Dockerfile.frontend
+    restart: unless-stopped
+    user: "1000:1000"
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+      TTS_BACKEND_URL: http://backend:4000
+      NODE_ENV: production
+      PORT: "3000"
+    volumes:
+      - appdata:/data
+    depends_on:
+      backend:
+        condition: service_healthy
 
   caddy:
     image: caddy:2-alpine
@@ -48,15 +59,10 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
-      - frontend
-      - backend
-
-  # OPTIONAL free neural voices (OpenAI-compatible /v1/audio/speech).
-  # Unverified image pin — test before relying on it, or use ElevenLabs.
-  # kokoro:
-  #   image: ghcr.io/remsky/kokoro-fastapi-cpu:latest
-  #   restart: unless-stopped
-  # then set OPEN_SOURCE_TTS_URL=http://kokoro:8880/v1/audio/speech in .env
+      frontend:
+        condition: service_started
+      backend:
+        condition: service_healthy
 
 volumes:
   appdata:

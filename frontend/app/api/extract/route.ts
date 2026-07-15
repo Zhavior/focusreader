@@ -85,7 +85,19 @@ export async function POST(req: Request) {
     );
   }
 
-  const cleaned = text.replace(/\s+\n/g, "\n").trim();
+  // Clean raw extracted document text: strip running headers, page numbers, watermarks, and bullet noise
+  const lines = text.split("\n");
+  const cleanedLines = lines.filter(line => {
+    const trimmed = line.trim();
+    if (!trimmed) return false;
+    if (/^(page\s*\d+(\s*(of|\/|-)\s*\d+)?|\d+\s*(of|\/)\s*\d+|\b\d{1,3}\b|[-–—]\s*\d+\s*[-–—])$/i.test(trimmed)) return false;
+    if (/^(copyright|©|all rights reserved|confidential|draft|do not distribute|issn|isbn|doi:)/i.test(trimmed)) return false;
+    if (/^[•▪■♦★☆►●*—–|+~=•\.\s,;:_/\\-]+$/.test(trimmed)) return false;
+    if (/^(fig(ure)?\.?|table|chart)\s*\d+(\.\d+)*[:\.-]?\s*$/i.test(trimmed)) return false;
+    return true;
+  });
+
+  const cleaned = cleanedLines.join("\n").replace(/\s+\n/g, "\n").trim();
 
   if (!cleaned) {
     return NextResponse.json(
@@ -98,10 +110,19 @@ export async function POST(req: Request) {
     );
   }
 
+  const finalStr = cleaned.length > MAX_TEXT_LENGTH ? cleaned.slice(0, MAX_TEXT_LENGTH) : cleaned;
   const truncated = cleaned.length > MAX_TEXT_LENGTH;
+  const words = finalStr.split(/\s+/).filter(Boolean);
+  const paragraphs = finalStr.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+  const estimatedMinutes = Math.max(1, Math.ceil(words.length / 200));
+
   return NextResponse.json({
-    text: truncated ? cleaned.slice(0, MAX_TEXT_LENGTH) : cleaned,
-    chars: truncated ? MAX_TEXT_LENGTH : cleaned.length,
+    text: finalStr,
+    chars: finalStr.length,
+    words: words.length,
+    paragraphs: paragraphs.length > 0 ? paragraphs : [finalStr],
+    estimatedMinutes,
     truncated,
   });
 }
+

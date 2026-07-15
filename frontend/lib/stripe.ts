@@ -50,15 +50,28 @@ export async function createCheckoutSession(params: {
   clerkUserId: string;
   customerEmail?: string;
   existingStripeCustomerId?: string;
+  priceId?: string;
 }): Promise<string> {
   const stripe = getStripe();
   const appUrl = requireEnv("NEXT_PUBLIC_APP_URL");
+
+  let resolvedPriceId = params.priceId || process.env.STRIPE_PREMIUM_PRICE_ID;
+  if (resolvedPriceId === "price_monthly_1999" || resolvedPriceId === "core") {
+    resolvedPriceId = process.env.STRIPE_MONTHLY_PRICE_ID || process.env.STRIPE_PREMIUM_PRICE_ID || "price_monthly_1999";
+  } else if (resolvedPriceId === "price_6months_8999" || resolvedPriceId === "pro") {
+    resolvedPriceId = process.env.STRIPE_PRO_PRICE_ID || process.env.STRIPE_PREMIUM_PRICE_ID || "price_6months_8999";
+  } else if (resolvedPriceId === "price_2years_19999" || resolvedPriceId === "enterprise") {
+    resolvedPriceId = process.env.STRIPE_ENTERPRISE_PRICE_ID || process.env.STRIPE_PREMIUM_PRICE_ID || "price_2years_19999";
+  }
+  if (!resolvedPriceId) {
+    resolvedPriceId = requireEnv("STRIPE_PREMIUM_PRICE_ID");
+  }
 
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     line_items: [
       {
-        price: requireEnv("STRIPE_PREMIUM_PRICE_ID"),
+        price: resolvedPriceId,
         quantity: 1,
       },
     ],

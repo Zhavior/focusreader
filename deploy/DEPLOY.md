@@ -1,75 +1,104 @@
-# FocusReader — Production Deploy Runbook (single VPS)
+# FocusReader / Hyperfi — Production Deploy & Cloud Orchestration Runbook
 
-Architecture: one small VPS (2GB RAM recommended, ~$5–12/mo: Hetzner CX22,
-DigitalOcean, Racknerd) runs frontend + TTS backend + Caddy (auto-HTTPS)
-via Docker Compose. SQLite + audio live on a shared volume — this is why
-we deploy to a persistent disk, not serverless.
+Our architecture supports both **Single VPS Docker Compose Orchestration** (recommended for launch & predictable fixed costs ~$5–12/mo) and **Auto-Scaling Google Cloud Run / AWS ECS Fargate** (for high-concurrency burst scaling).
 
-## 0. Prerequisites (owner actions — accounts/money)
-- A VPS (Ubuntu 22.04+) and a domain you control
-- Clerk **production** instance keys (dashboard.clerk.com → your app → Production)
-- Stripe keys + the $19/mo price (see step 3 of the launch plan)
-- An ELEVENLABS_API_KEY (free tier works to start) — **required**: the free
-  local Mac voice does not exist on Linux
+---
 
-## 1. DNS
-Create two A records pointing at the VPS IP:
-- `app.<yourdomain>` and `api.<yourdomain>`
+## 0. Prerequisites (Owner Actions & Accounts)
+- **Domain & SSL**: A domain you control (`hyperfi.ai` or your custom domain).
+- **Authentication Keys**: Clerk **Production** instance API keys (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` & `CLERK_SECRET_KEY`).
+- **Billing Keys**: Stripe Live Secret Key + Webhook Signing Secret (`STRIPE_WEBHOOK_SECRET`).
+- **Neural TTS Provider**: `ELEVENLABS_API_KEY` or `OPEN_SOURCE_TTS_URL`. *(Note: macOS local `say` / `LocalTts` is only for local dev; Linux containers fall back to OpenSource / EdgeTTS if ElevenLabs is unavailable).*
 
-## 2. On the VPS
+---
+
+## Option A: Single VPS Orchestration (Docker Compose - Recommended for Launch)
+
+### 1. DNS Setup
+Create two A records pointing at your VPS public IP:
+- `app.<yourdomain>` (Frontend Next.js app)
+- `api.<yourdomain>` (Backend TTS streaming engine)
+
+### 2. Launch Stack on VPS
 ```bash
 curl -fsSL https://get.docker.com | sh
 git clone https://github.com/Zhavior/focusreader.git && cd focusreader/deploy
 cp env.production.example .env
-nano .env          # fill every value; generate INTERNAL_API_SECRET fresh
+nano .env          # Fill every value securely; generate INTERNAL_API_SECRET
 docker compose up -d --build
 ```
 
-## 3. Verify (do not skip)
+---
+
+## Option B: Auto-Scaling Cloud Deployment (Google Cloud Run / AWS ECS)
+
+### 1. Build & Push Multi-Stage Hardened Container
+Our Docker containers (`backend/Dockerfile` and `deploy/Dockerfile.frontend`) run under least-privilege `USER node` (`uid 1000:1000`) and contain multi-stage native compilation optimizations (`ffmpeg`, `curl`, `better-sqlite3`).
+
 ```bash
-# TTS engine healthy
-curl -s https://api.<domain>/api/tts/health          # {"status":"ok"}
+# Authenticate and configure Google Cloud project
+gcloud auth configure-docker
+export PROJECT_ID=your-gcp-project-id
 
-# Metering gate: no secret → 401 (engine is not open to the world)
+# Build and push Backend Container
+docker build -t gcr.io/$PROJECT_ID/hyperfi-backend:latest -f backend/Dockerfile ./backend
+docker push gcr.io/$PROJECT_ID/hyperfi-backend:latest
+
+# Deploy Backend to Cloud Run (Auto-scales from 1 up to 100+ concurrent instances)
+gcloud run deploy hyperfi-backend \
+  --image gcr.io/$PROJECT_ID/hyperfi-backend:latest \
+  --port 4000 \
+  --cpu 2 \
+  --memory 1Gi \
+  --min-instances 1 \
+  --max-instances 100 \
+  --set-env-vars NODE_ENV=production,PORT=4000 \
+  --set-secrets ELEVENLABS_API_KEY=elevenlabs-key:latest,INTERNAL_API_SECRET=internal-api-secret:latest \
+  --allow-unauthenticated \
+  --region us-central1
+```
+
+---
+
+## 3. Verification Commands (Do Not Skip)
+
+### Verify Deep Health & Readiness Probes (`/health/live` & `/health/ready`)
+```bash
+# 1. Check Liveness Probe (Instant response checking HTTP event loop & process state)
+curl -s https://api.<domain>/health/live
+# Expected: {"status":"ok","timestamp":"2026-07-14T..."}
+
+# 2. Check Readiness Probe (Verifies SQLite WAL write locks & audio cache write permissions)
+curl -s https://api.<domain>/health/ready
+# Expected: {"status":"ready","database":"connected","audioCacheDir":"writable"}
+```
+
+### Verify Metered Audio Stream Gate
+```bash
+# 1. No auth token / secret -> expect 401 Unauthorized (Protected endpoint)
 curl -s -o /dev/null -w "%{http_code}\n" -X POST https://api.<domain>/api/tts/stream \
-  -H "Content-Type: application/json" -d '{"text":"hi"}'   # expect 401
+  -H "Content-Type: application/json" -d '{"text":"hi"}'
+# Output: 401
 
-# Full voice check WITH the secret (from .env)
+# 2. Verified stream check with valid API key or Internal Secret
 curl -s -X POST https://api.<domain>/api/tts/stream \
   -H "Content-Type: application/json" -H "x-internal-secret: $SECRET" \
-  -d '{"text":"Production voice check."}' -o /tmp/check.mp3
+  -d '{"text":"Production voice synthesis test."}' -o /tmp/check.mp3
 ffprobe -v error -show_entries format=duration -of csv=p=0 /tmp/check.mp3
-
-# Frontend up
-curl -s -o /dev/null -w "%{http_code}\n" https://app.<domain>/    # 200
 ```
 
-## 4. Stripe webhook (production)
-Dashboard → Webhooks → Add endpoint:
-`https://app.<domain>/api/webhooks/stripe`
-Events: `checkout.session.completed`, `invoice.payment_succeeded`,
-`customer.subscription.deleted`. Put the signing secret in `.env`
-(STRIPE_WEBHOOK_SECRET) and `docker compose up -d` again.
+---
 
-## 5. Point the extension at production
-The extension reads its endpoints from storage (defaults are localhost).
-Open the extension popup → right-click → Inspect → Console:
-```js
-chrome.storage.sync.set({
-  zhaviorApiBase: "https://app.<domain>",
-  zhaviorTtsBase: "https://api.<domain>"
-});
-```
-(Adding popup fields for this is a pre-Store-submission TODO.)
+## 4. Stripe Production Webhook Configuration
+In your Stripe Dashboard -> Webhooks -> Add endpoint (`https://app.<domain>/api/webhooks/stripe`):
+- Subscribe to: `checkout.session.completed`, `invoice.payment_succeeded`, `customer.subscription.deleted`.
+- Copy the signing secret (`whsec_...`) into `.env` under `STRIPE_WEBHOOK_SECRET` and restart (`docker compose up -d`).
 
-## 6. Backups (do this before real users)
+---
+
+## 5. Automated Database Backups (WAL-Safe Snapshotting)
 ```bash
-# Nightly SQLite + audio snapshot; graduate to Litestream→S3 when revenue exists
+# Nightly atomic backup using SQLite online backup / safe copy
 (crontab -l; echo '0 3 * * * docker compose -f ~/focusreader/deploy/docker-compose.yml \
   exec -T backend sh -c "cp /data/focusreader.db /data/focusreader.db.bak"') | crontab -
 ```
-
-## Known v1 limits (accepted deliberately)
-- Single instance; in-process job queue dies with the container (restarts requeue nothing)
-- No monitoring — add UptimeRobot on both /health URLs minimum, Sentry when possible
-- SQLite write concurrency is fine at this scale; revisit past ~1k users

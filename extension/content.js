@@ -21,19 +21,32 @@
   if (window.__frScriptLoaded) return;
   window.__frScriptLoaded = true;
 
-  // Server endpoints. Defaults are local dev; production overrides live in
-  // chrome.storage.sync (set once at install/login) so the same build ships
-  // to the Web Store without code changes. All consumers read these lets at
-  // call time, so the async override lands before any user-initiated fetch.
-  let API_BASE = "http://localhost:3001";   // Next.js frontend (dashboard, notes)
-  let TTS_BASE  = "http://localhost:4000";  // Express backend (TTS — no proxy deadlock)
+  // Server endpoints. Defaults are local dev or CONFIG overrides; production overrides live in
+  // chrome.storage.sync (set once at install/login) so the same build ships to the Web Store.
+  let API_BASE = (typeof CONFIG !== "undefined" && CONFIG.APP_URL) ? CONFIG.APP_URL : "http://localhost:3001";
+  let TTS_BASE  = (typeof CONFIG !== "undefined" && CONFIG.TTS_URL) ? CONFIG.TTS_URL : "http://localhost:4000";
   let DASHBOARD_URL = `${API_BASE}/dashboard`;
   try {
     chrome?.storage?.sync?.get(["zhaviorApiBase", "zhaviorTtsBase"], (res) => {
       if (res?.zhaviorApiBase) { API_BASE = res.zhaviorApiBase.replace(/\/$/, ""); DASHBOARD_URL = `${API_BASE}/dashboard`; }
       if (res?.zhaviorTtsBase) { TTS_BASE = res.zhaviorTtsBase.replace(/\/$/, ""); }
     });
+    chrome?.runtime?.sendMessage({ action: "CHECK_AUTH_STATUS" }, (res) => {
+      if (res && res.token) {
+        window.__hyperfiAuthToken = res.token;
+      }
+    });
   } catch { /* storage unavailable — keep dev defaults */ }
+
+  // One-Click Tokenless Auth: intercept token broadcasts when logged into Hyperfi dashboard
+  window.addEventListener("message", (event) => {
+    if (event.data && event.data.type === "HYPERFI_SESSION_TOKEN" && event.data.token) {
+      if (window.location.hostname.includes("hyperfi") || window.location.hostname.includes("localhost")) {
+        window.__hyperfiAuthToken = event.data.token;
+        chrome?.runtime?.sendMessage({ action: "SAVE_AUTH_TOKEN", token: event.data.token }, () => {});
+      }
+    }
+  });
 
   // ==========================================
   // THEME (visual truth preserved from v2)
@@ -101,10 +114,20 @@
 
       const tokens = [];
       let cumulative = 0;
+      let charOffset = 0;
       for (const t of raw) {
         const startFrac = cumulative / totalWeight;
         cumulative += t.weight;
-        tokens.push({ word: t.word, startFrac, endFrac: cumulative / totalWeight });
+        const charStart = text.indexOf(t.word, charOffset);
+        const charEnd = charStart !== -1 ? charStart + t.word.length : charOffset + t.word.length;
+        if (charStart !== -1) charOffset = charEnd;
+        tokens.push({
+          word: t.word,
+          startFrac,
+          endFrac: cumulative / totalWeight,
+          charStart: charStart !== -1 ? charStart : 0,
+          charEnd: charEnd
+        });
       }
       return { tokens, words };
     },
@@ -131,10 +154,34 @@
       return new Promise((resolve) => {
         if (!chrome?.storage?.sync) return resolve('');
         chrome.storage.sync.get(['zhaviorToken'], res => {
-          Utils._cachedToken = res.zhaviorToken || '';
-          resolve(Utils._cachedToken);
+          if (res.zhaviorToken) {
+            Utils._cachedToken = res.zhaviorToken;
+            return resolve(Utils._cachedToken);
+          }
+          if (window.__hyperfiAuthToken) {
+            Utils._cachedToken = window.__hyperfiAuthToken;
+            return resolve(Utils._cachedToken);
+          }
+          if (chrome.storage.local) {
+            chrome.storage.local.get(['hyperfi_auth_token', 'access_token'], loc => {
+              Utils._cachedToken = loc.hyperfi_auth_token || loc.access_token || '';
+              resolve(Utils._cachedToken);
+            });
+          } else {
+            resolve('');
+          }
         });
       });
+    },
+
+    tracedFetch(url, options = {}) {
+      const headers = new Headers(options.headers || {});
+      const genHex = (len) => Array.from({length: len}, () => Math.floor(Math.random() * 16).toString(16)).join('');
+      const traceId = genHex(32);
+      const spanId = genHex(16);
+      headers.set('traceparent', `00-${traceId}-${spanId}-01`);
+      headers.set('x-trace-id', traceId);
+      return fetch(url, { ...options, headers });
     },
 
     /** Persisted user preferences (speed/color/bionic/noise/voice survive sessions). */
@@ -165,6 +212,7 @@
         }
         chrome.storage.local.set({ zhaviorLibrary: list });
       });
+      Utils.syncToCloudVault(item);
     },
 
     toggleFavorite(url, cb) {
@@ -187,7 +235,33 @@
           });
         }
         chrome.storage.local.set({ zhaviorLibrary: list }, () => { if (cb) cb(newStatus); });
+        if (newStatus) {
+          Utils.syncToCloudVault({ url, title: document.title || window.location.hostname });
+        }
       });
+    },
+
+    async syncToCloudVault(item) {
+      try {
+        const token = await Utils.getToken();
+        if (!token) return;
+        const textToSave = item.text || ArticleExtractor?.extract()?.map(p => p.text).join('\n\n') || document.body?.innerText?.slice(0, 100000) || "";
+        if (!textToSave) return;
+        await Utils.tracedFetch(`${API_BASE}/api/extension-vault`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            title: item.title || document.title || window.location.hostname,
+            url: item.url || window.location.href,
+            text: textToSave,
+            speed: 1.5,
+            background: 'brown_noise'
+          })
+        });
+      } catch { /* best-effort cloud sync */ }
     }
   };
 
@@ -200,12 +274,23 @@
       const rawParagraphs = articleNode.querySelectorAll('p, h1, h2, h3, h4, blockquote, li, .paragraph, .article-paragraph');
       const validParagraphs = [];
 
-      const badSelector = 'nav, footer, aside, figure, .sidebar, .comments, .ad, .promo, .social, [id*="nav"], [id*="footer"], [class*="ad-"], [class*="sponsored"], [class*="newsletter"]';
-      const ctaKeywords = ['in your inbox', 'join medium', 'get updates', 'subscribe to', 'sign up', 'read more from', 'written by', 'newsletter'];
+      const badSelector = 'nav, footer, aside, figure, .sidebar, .comments, .ad, .promo, .social, [id*="nav"], [id*="footer"], [class*="ad-"], [class*="sponsored"], [class*="newsletter"], .cookie-banner, [class*="cookie"], [class*="share"], [class*="meta"], .author-bio, .related-posts, [aria-label="breadcrumb"], [role="navigation"], [role="complementary"], [role="contentinfo"], .ad-container, #banner';
+      const ctaKeywords = ['in your inbox', 'join medium', 'get updates', 'subscribe to', 'sign up', 'read more from', 'written by', 'newsletter', 'accept cookies', 'privacy policy'];
+
+      const isNoiseParagraph = (text) => {
+        const trimmed = text.trim();
+        if (!trimmed) return true;
+        if (trimmed.length < 15 && !/[a-zA-Z]{3,}/.test(trimmed)) return true;
+        if (/^(share on|click to copy|copy link|subscribe|read next|more from|photo by|image credit|continue reading|ad[v]?\.|advertisement|sponsored by|read time:|min read|page \d+ of \d+|table of contents)/i.test(trimmed)) {
+          return true;
+        }
+        if (/^[•▪■♦★☆►●*—–|+~=•\.\s,;:_/\\-]+$/.test(trimmed)) return true;
+        return false;
+      };
 
       rawParagraphs.forEach(p => {
         const text = (p.innerText || p.textContent || '').trim();
-        if (text.length < 5) return;
+        if (isNoiseParagraph(text)) return;
         if (p.closest(badSelector)) return;
 
         let linkTextLen = 0;
@@ -219,9 +304,47 @@
         }
       });
 
+      // Multi-Stage Fallback 1: If standard paragraph tags yield < 2 blocks (e.g. Notion, Google Docs, complex SPAs)
+      if (validParagraphs.length < 2) {
+        const divContainers = articleNode.querySelectorAll('div, section, span, li');
+        divContainers.forEach(div => {
+          if (div.closest(badSelector)) return;
+          const text = (div.innerText || div.textContent || '').trim();
+          if (isNoiseParagraph(text) || text.length > 3000) return;
+
+          // Check if this container has block-level children that already extracted text to avoid duplicate overlapping chunks
+          const hasInnerParagraphs = div.querySelector('p, h1, h2, h3, blockquote');
+          if (hasInnerParagraphs && validParagraphs.length > 0) return;
+
+          let linkTextLen = 0;
+          div.querySelectorAll('a').forEach(a => { linkTextLen += (a.innerText || "").length; });
+          const linkDensity = linkTextLen / Math.max(text.length, 1);
+          if (linkDensity < 0.45 && !validParagraphs.includes(text)) {
+            // Split clean double-newline blocks inside divs
+            text.split(/\n{2,}/).forEach(subBlock => {
+              const cleanSub = subBlock.trim();
+              if (!isNoiseParagraph(cleanSub) && cleanSub.length >= 40 && !validParagraphs.includes(cleanSub)) {
+                validParagraphs.push(cleanSub);
+              }
+            });
+          }
+        });
+      }
+
+      // Multi-Stage Fallback 2: Ultimate fallback to innerText splitting if still empty
+      if (validParagraphs.length === 0) {
+        const rawBodyText = (document.body?.innerText || '').trim();
+        if (rawBodyText) {
+          rawBodyText.split(/\n{2,}/).forEach(block => {
+            const cleanBlock = block.trim();
+            if (!isNoiseParagraph(cleanBlock) && cleanBlock.length >= 30) validParagraphs.push(cleanBlock);
+          });
+        }
+      }
+
       if (validParagraphs.length === 0) return { paragraphs: [], chunks: [], chunkWordRanges: [] };
 
-      // Build sentences across all paragraphs, keeping exact word counts
+      // Build fluid sentences across all paragraphs, keeping exact word counts
       const chunks = [];
       const chunkWordRanges = [];
       let currentWords = [];
@@ -231,12 +354,12 @@
       validParagraphs.forEach(pText => {
         pText.split(/(?<=[.?!])\s+/).forEach(sentence => {
           const trimmed = sentence.trim();
-          if (!trimmed) return;
+          if (!trimmed || isNoiseParagraph(trimmed)) return;
           const sWords = trimmed.split(/\s+/).filter(Boolean);
           if (sWords.length === 0) return;
 
-          const maxLimit = chunks.length === 0 ? 80 : 340;
-          const maxWords = chunks.length === 0 ? 14 : 55;
+          const maxLimit = chunks.length === 0 ? 160 : 360;
+          const maxWords = chunks.length === 0 ? 25 : 55;
 
           // If adding this sentence exceeds chunk limit and we already have words buffered, flush
           if ((currentWords.join(' ').length + trimmed.length + 1 > maxLimit || currentWords.length + sWords.length > maxWords) && currentWords.length > 0) {
@@ -292,15 +415,20 @@
   // Each mode renders 8 seconds of binaural stereo (2-channel) noise ONCE into
   // an AudioBuffer, then loops seamlessly via AudioBufferSourceNode with 200ms cosine crossfade.
   const Soundscapes = {
-    LOOP_SECONDS: 8,
+    LOOP_SECONDS: 600, // 10 FULL MINUTES (600 seconds) so 7-9 minute reading sessions NEVER loop once!
     cache: new Map(),
 
     getBuffer(ctx, mode) {
       if (this.cache.has(mode)) return this.cache.get(mode);
-      const length = ctx.sampleRate * this.LOOP_SECONDS;
-      const buffer = ctx.createBuffer(2, length, ctx.sampleRate);
+      const sampleRate = ctx.sampleRate;
+      const length = sampleRate * this.LOOP_SECONDS;
+      const fadeLen = Math.floor(sampleRate * 2.0); // 2-second ultra-smooth equal-power crossfade seam if they read > 10 minutes
+      const totalSamples = length + fadeLen;
+      const buffer = ctx.createBuffer(2, length, sampleRate);
       const left = buffer.getChannelData(0);
       const right = buffer.getChannelData(1);
+      const rawL = new Float32Array(totalSamples);
+      const rawR = new Float32Array(totalSamples);
 
       // Decorrelated DSP filters for immersive 3D spatial separation
       let lastL = 0, lastR = 0;
@@ -308,7 +436,7 @@
       const bR = [0, 0, 0, 0, 0, 0, 0];
       let rainTimerL = 0, rainTimerR = 0;
 
-      for (let i = 0; i < length; i++) {
+      for (let i = 0; i < totalSamples; i++) {
         const whiteL = Math.random() * 2 - 1;
         const whiteR = Math.random() * 2 - 1;
         let sL = 0, sR = 0;
@@ -321,7 +449,6 @@
           sL *= 3.8;
           sR *= 3.8;
         } else if (mode === 2 || mode === 4 || mode === 5) { // Binaural Pink / Rain / Heavy Atmosphere
-          // Paul Kellet 7-pole filter bank with decorrelated L/R channels
           bL[0] = 0.99886 * bL[0] + whiteL * 0.0555179;
           bL[1] = 0.99332 * bL[1] + whiteL * 0.0750759;
           bL[2] = 0.96900 * bL[2] + whiteL * 0.1538520;
@@ -352,7 +479,6 @@
             if (rainTimerL > 0) rainL += whiteL * 0.18 * (rainTimerL / 280);
             if (rainTimerR > 0) rainR += whiteR * 0.18 * (rainTimerR / 280);
 
-            // Add deep warm low-end rumble for heavy rain (mode 5)
             sL = rainL * (mode === 5 ? 1.75 : 1.25);
             sR = rainR * (mode === 5 ? 1.75 : 1.25);
           }
@@ -360,19 +486,21 @@
           sL = whiteL * 0.14;
           sR = whiteR * 0.14;
         }
-        left[i] = sL;
-        right[i] = sR;
+        rawL[i] = sL;
+        rawR[i] = sR;
       }
 
-      // 200ms seamless equal-power cosine crossfade at loop boundary
-      const fade = Math.floor(ctx.sampleRate * 0.2);
-      for (let ch = 0; ch < 2; ch++) {
-        const data = buffer.getChannelData(ch);
-        for (let i = 0; i < fade; i++) {
-          const k = i / fade;
-          const gainStart = Math.cos(k * 0.5 * Math.PI);
-          const gainEnd = Math.sin(k * 0.5 * Math.PI);
-          data[i] = data[i] * gainStart + data[length - fade + i] * gainEnd;
+      // True equal-power overlap blending at loop boundary without any volume drop
+      for (let i = 0; i < length; i++) {
+        if (i < fadeLen) {
+          const frac = i / fadeLen;
+          const gainStart = Math.sin(frac * 0.5 * Math.PI);
+          const gainEnd = Math.cos(frac * 0.5 * Math.PI);
+          left[i] = rawL[i] * gainStart + rawL[length + i] * gainEnd;
+          right[i] = rawR[i] * gainStart + rawR[length + i] * gainEnd;
+        } else {
+          left[i] = rawL[i];
+          right[i] = rawR[i];
         }
       }
 
@@ -394,6 +522,7 @@
       this.voiceIdx = 0;
       this.voiceAudio = null;
       this.playbackRate = 1.0;
+      this.abortController = null;
     }
 
     ensureCtx() {
@@ -439,17 +568,24 @@
       this.noiseSource.start();
     }
 
-    async fetchTTS(text, retries = 1) {
+    async fetchTTS(text, retries = 3) {
       if (!text || typeof text !== 'string' || !text.trim()) {
         throw terminalError("Text chunk is empty or invalid.");
       }
+      if (this.abortController) {
+        this.abortController.abort();
+      }
+      this.abortController = new AbortController();
+      const signal = this.abortController.signal;
+
       try {
         const token = await Utils.getToken();
         if (!token) throw terminalError("Not logged in — open the extension popup to add your token.");
 
         const activeVoice = THEME.voices[this.voiceIdx || 0];
-        const res = await fetch(`${TTS_BASE}/api/extension/tts`, {
+        const res = await Utils.tracedFetch(`${TTS_BASE}/api/extension/tts`, {
           method: 'POST',
+          signal,
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
@@ -474,22 +610,26 @@
         if (!res.ok) {
           let errMsg = `API Error ${res.status}`;
           try { const data = await res.json(); if (data.message) errMsg = data.message; } catch { /* not json */ }
-          throw terminalError(`TTS Error (${res.status}): ${errMsg}`);
+          throw new Error(`TTS Error (${res.status}): ${errMsg}`);
         }
 
         const blob = await res.blob();
         return URL.createObjectURL(blob);
       } catch (err) {
+        if (err.name === 'AbortError' || signal.aborted) {
+          throw err; // Silently terminate on intentional user abort without retries
+        }
         if (retries > 0 && !err.terminal) {
           const isNetworkErr = err instanceof TypeError;
-          await new Promise(r => setTimeout(r, isNetworkErr ? 3000 : 1500));
+          const waitTime = isNetworkErr ? 2500 : (4 - retries) * 1000;
+          await new Promise(r => setTimeout(r, waitTime));
           return this.fetchTTS(text, retries - 1);
         }
-        if (err instanceof TypeError) {
-          console.warn("[FocusReader] Network/Server offline — switching to high-speed WebSpeech neural engine.");
-          return "webspeech_fallback";
+        if (err.terminal) {
+          throw err;
         }
-        throw err;
+        console.warn("[FocusReader] Cloud engine unavailable or timed out — falling back to local neural WebSpeech engine:", err.message);
+        return "webspeech_fallback";
       }
     }
 
@@ -514,13 +654,29 @@
         }
       };
       utterance.onend = () => {
+        if (this.webSpeechLivenessTimer) clearInterval(this.webSpeechLivenessTimer);
+        this.webSpeechLivenessTimer = null;
         if (onEnd) onEnd();
       };
       utterance.onerror = () => {
+        if (this.webSpeechLivenessTimer) clearInterval(this.webSpeechLivenessTimer);
+        this.webSpeechLivenessTimer = null;
         if (onEnd) onEnd();
       };
       this.activeUtterance = utterance;
       window.speechSynthesis.speak(utterance);
+
+      // Industry-standard anti-freeze workaround for Chrome/macOS 15-second speech synthesis timeout bug
+      if (this.webSpeechLivenessTimer) clearInterval(this.webSpeechLivenessTimer);
+      this.webSpeechLivenessTimer = setInterval(() => {
+        if (window.speechSynthesis && window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+          window.speechSynthesis.pause();
+          window.speechSynthesis.resume();
+        } else if (window.speechSynthesis && !window.speechSynthesis.speaking) {
+          if (this.webSpeechLivenessTimer) clearInterval(this.webSpeechLivenessTimer);
+          this.webSpeechLivenessTimer = null;
+        }
+      }, 10000);
     }
 
     playVoice(url, onPlay, onEnd) {
@@ -558,6 +714,14 @@
     }
 
     stopVoice() {
+      if (this.webSpeechLivenessTimer) {
+        clearInterval(this.webSpeechLivenessTimer);
+        this.webSpeechLivenessTimer = null;
+      }
+      if (this.abortController) {
+        this.abortController.abort();
+        this.abortController = null;
+      }
       if (this.voiceAudio) {
         this.voiceAudio.pause();
         this.voiceAudio.src = '';
@@ -894,12 +1058,14 @@
       this.audio = new AudioEngine();
 
       this.currentChunkIdx = 0;
+      this.expectedNextChunkIdx = 0;
       this.isPaused = false;
       this.isQueueActive = true;
       this.audioQueue = [];
       this.isPlaying = false;
       this.nextFetchIdx = 0;
       this.inflightFetches = 0;
+      this.queueGeneration = 0;
 
       this.config = { ...prefs };
 
@@ -942,7 +1108,8 @@
         this.applyVoice();
         this.persist();
 
-        if (this.isPlaying) {
+        if (this.isPlaying || this.audioQueue.length > 0) {
+          this.queueGeneration = (this.queueGeneration || 0) + 1;
           this.audioQueue.forEach(i => URL.revokeObjectURL(i.url));
           this.audioQueue = [];
           this.audio.stopVoice();
@@ -1180,12 +1347,14 @@
       }
 
       // Seeking into a different chunk
+      this.queueGeneration = (this.queueGeneration || 0) + 1;
       this.audioQueue.forEach(i => URL.revokeObjectURL(i.url));
       this.audioQueue = [];
       this.audio.stopVoice();
       this.stopKaraoke();
       this.isPlaying = false;
       this.currentChunkIdx = targetChunkIdx;
+      this.expectedNextChunkIdx = targetChunkIdx;
       this.nextFetchIdx = targetChunkIdx;
       this.inflightFetches = 0;
 
@@ -1205,7 +1374,7 @@
       if (this.isPaused) this.resumeSystem();
     }
 
-    // --- Audio queue: keep up to 6 chunks buffered ahead (`120+ seconds`) for uninterrupted playback ---
+    // --- Audio queue: keep up to 6 chunks buffered ahead (`120+ seconds`) with Monotonic Generation race immunity ---
     fillBuffer() {
       while (
         this.isQueueActive &&
@@ -1215,17 +1384,26 @@
       ) {
         const fetchIdx = this.nextFetchIdx++;
         this.inflightFetches++;
+        const currentGen = this.queueGeneration;
+
         const fetchReq = (fetchIdx === 0 && this.prefetchPromise)
           ? this.prefetchPromise.then(url => { this.prefetchPromise = null; return url || this.audio.fetchTTS(this.chunks[fetchIdx]); })
           : this.audio.fetchTTS(this.chunks[fetchIdx]);
+
         fetchReq
           .then(url => {
-            if (!this.isQueueActive) { if (url) URL.revokeObjectURL(url); return; }
+            if (currentGen !== this.queueGeneration || !this.isQueueActive) {
+              if (url && url !== "webspeech_fallback") URL.revokeObjectURL(url);
+              return;
+            }
             this.audioQueue.push({ url, chunkIdx: fetchIdx });
             this.audioQueue.sort((a, b) => a.chunkIdx - b.chunkIdx);
-            if (!this.isPlaying && !this.isPaused) this.playNextInQueue();
+            if (!this.isPlaying && !this.isPaused && this.audioQueue.length > 0 && this.audioQueue[0].chunkIdx === this.expectedNextChunkIdx) {
+              this.playNextInQueue();
+            }
           })
           .catch(err => {
+            if (currentGen !== this.queueGeneration || err.name === 'AbortError') return;
             console.error("[FocusReader] TTS fetch failed:", err);
             if (err.terminal) {
               this.isQueueActive = false;
@@ -1234,11 +1412,16 @@
                 : () => window.open(`${DASHBOARD_URL}/tools`, '_blank');
               this.ui.showToast(err.message, true, action);
             } else {
-              // Non-terminal failure: allow remaining queue and future fetches to continue without killing playback
-              this.ui.showToast(`TTS Notice: ${err.message || "Chunk delayed"}`, false);
+              this.ui.showToast(`TTS Notice: ${err.message || "Chunk delayed — using offline engine"}`, false);
+              this.audioQueue.push({ url: "webspeech_fallback", chunkIdx: fetchIdx });
+              this.audioQueue.sort((a, b) => a.chunkIdx - b.chunkIdx);
+              if (!this.isPlaying && !this.isPaused && this.audioQueue.length > 0 && this.audioQueue[0].chunkIdx === this.expectedNextChunkIdx) {
+                this.playNextInQueue();
+              }
             }
           })
           .finally(() => {
+            if (currentGen !== this.queueGeneration) return;
             this.inflightFetches--;
             if (this.isQueueActive) this.fillBuffer();
           });
@@ -1246,14 +1429,22 @@
     }
 
     playNextInQueue() {
-      if (!this.isQueueActive || this.audioQueue.length === 0) {
+      if (!this.isQueueActive || this.isPaused) {
         this.isPlaying = false;
+        return;
+      }
+      if (this.audioQueue.length === 0 || this.audioQueue[0].chunkIdx !== this.expectedNextChunkIdx) {
+        this.isPlaying = false;
+        if (this.expectedNextChunkIdx < this.chunks.length) {
+          this.fillBuffer();
+        }
         return;
       }
 
       this.isPlaying = true;
       const { url, chunkIdx } = this.audioQueue.shift();
       this.currentChunkIdx = chunkIdx;
+      this.expectedNextChunkIdx = chunkIdx + 1;
 
       const currentTokens = this.chunkTokens[chunkIdx]?.tokens || [];
       if (url === "webspeech_fallback") {
@@ -1450,7 +1641,7 @@
       this.btn = document.createElement('button');
       const mins = Math.max(1, Math.round((document.body?.innerText || "").length / 5000));
       this.btn.innerHTML = `${ICONS.headphones} <span>Listen &middot; ~${mins}m</span>`;
-      this.btn.title = "Zhavior FocusReader (Hover to expand & listen aloud)";
+      this.btn.title = "Hyperfi Reader (Hover to expand & listen aloud)";
       this.btn.onclick = () => this.start();
       this.btn.onmouseenter = () => this.prewarm();
       shadow.appendChild(this.btn);
@@ -1470,10 +1661,16 @@
         }
         if (this.chunks && this.chunks.length > 0 && !this.prefetchPromise) {
           const firstChunk = this.chunks[0];
-          this.prefetchPromise = fetch(`${API_BASE}/extension/tts`, {
+          const prefs = await Utils.loadPrefs();
+          const activeVoice = THEME.voices[prefs.voiceIdx || 0];
+          this.prefetchPromise = Utils.tracedFetch(`${TTS_BASE}/api/extension/tts`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ text: firstChunk })
+            body: JSON.stringify({
+              text: firstChunk,
+              voice: activeVoice ? activeVoice.id : undefined,
+              voiceId: activeVoice ? activeVoice.elevenId : undefined
+            })
           }).then(res => res.ok ? res.blob() : null).then(b => b ? URL.createObjectURL(b) : null).catch(() => null);
         }
       } catch (e) { /* ignore prewarm errors */ }
@@ -1483,7 +1680,7 @@
       if (this.controller) return;
       const token = await Utils.getToken();
       if (!token) {
-        alert("Action Required: Please click the Zhavior extension icon in your browser toolbar (top right) and paste your Access Token to log in!");
+        alert("Action Required: Please click the Hyperfi extension icon in your browser toolbar (top right) and paste your Access Token to log in!");
         window.open(`${DASHBOARD_URL}/tools`, '_blank');
         return;
       }
@@ -1501,10 +1698,16 @@
 
       if (!this.prefetchPromise) {
         const firstChunk = data.chunks[0];
-        this.prefetchPromise = fetch(`${API_BASE}/extension/tts`, {
+        const prefs = await Utils.loadPrefs();
+        const activeVoice = THEME.voices[prefs.voiceIdx || 0];
+        this.prefetchPromise = Utils.tracedFetch(`${TTS_BASE}/api/extension/tts`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ text: firstChunk })
+          body: JSON.stringify({
+            text: firstChunk,
+            voice: activeVoice ? activeVoice.id : undefined,
+            voiceId: activeVoice ? activeVoice.elevenId : undefined
+          })
         }).then(res => res.ok ? res.blob() : null).then(b => b ? URL.createObjectURL(b) : null).catch(() => null);
       }
 
@@ -1527,7 +1730,42 @@
   // ==========================================
   let launcher = null;
 
+  function syncBridgeToken() {
+    const bridge = document.getElementById("fr-auth-bridge");
+    if (!bridge) return;
+    const token = bridge.getAttribute("data-token");
+    const apiBase = bridge.getAttribute("data-api-base");
+    const ttsBase = bridge.getAttribute("data-tts-base");
+    if (!token) return;
+
+    if (chrome?.storage?.sync) {
+      const updates = {};
+      chrome.storage.sync.get(['zhaviorToken', 'zhaviorApiBase', 'zhaviorTtsBase'], res => {
+        if (res.zhaviorToken !== token) {
+          updates.zhaviorToken = token;
+          Utils._cachedToken = token;
+        }
+        if (apiBase && res.zhaviorApiBase !== apiBase) {
+          updates.zhaviorApiBase = apiBase;
+          API_BASE = apiBase;
+          DASHBOARD_URL = `${apiBase}/dashboard`;
+        }
+        if (ttsBase && res.zhaviorTtsBase !== ttsBase) {
+          updates.zhaviorTtsBase = ttsBase;
+          TTS_BASE = ttsBase;
+        }
+
+        if (Object.keys(updates).length > 0) {
+          chrome.storage.sync.set(updates, () => {
+            console.log("[FocusReader] Automatically synced authentication token & environment config from website!");
+          });
+        }
+      });
+    }
+  }
+
   function attemptInit() {
+    syncBridgeToken();
     if (launcher || !document.body) return;
     launcher = new Launcher(null);
   }
@@ -1538,6 +1776,7 @@
   // SPA navigations: reset launcher only if URL changes
   let lastHref = location.href;
   setInterval(() => {
+    syncBridgeToken();
     if (location.href === lastHref) return;
     lastHref = location.href;
     if (launcher && !launcher.controller) {

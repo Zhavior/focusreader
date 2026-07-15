@@ -13,18 +13,61 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function updateUI() {
-    chrome.storage.sync.get(['zhaviorToken'], (res) => {
-      if (res.zhaviorToken) {
+    chrome.runtime.sendMessage({ action: 'CHECK_AUTH_STATUS' }, (authRes) => {
+      if (authRes && authRes.logged_in) {
         loginState.style.display = 'none';
         loggedInState.style.display = 'block';
       } else {
-        loginState.style.display = 'block';
-        loggedInState.style.display = 'none';
+        chrome.storage.sync.get(['zhaviorToken'], (res) => {
+          if (res.zhaviorToken) {
+            loginState.style.display = 'none';
+            loggedInState.style.display = 'block';
+          } else {
+            loginState.style.display = 'block';
+            loggedInState.style.display = 'none';
+          }
+        });
       }
     });
   }
 
   const libraryBtn = document.getElementById('libraryBtn');
+  const voiceCtrlBtn = document.getElementById('voiceCtrlBtn');
+
+  chrome.storage.local.get(['voiceCtrlEnabled'], (res) => {
+    if (voiceCtrlBtn) {
+      if (res.voiceCtrlEnabled) {
+        voiceCtrlBtn.textContent = '🛑 Disable Voice Controller';
+        voiceCtrlBtn.style.background = '#f59e0b';
+      } else {
+        voiceCtrlBtn.textContent = '🎙️ Enable Voice Controller v4.0';
+        voiceCtrlBtn.style.background = 'linear-gradient(135deg, #10b981, #06b6d4)';
+      }
+    }
+  });
+
+  if (voiceCtrlBtn) {
+    voiceCtrlBtn.addEventListener('click', () => {
+      chrome.storage.local.get(['voiceCtrlEnabled'], (res) => {
+        const nextState = !res.voiceCtrlEnabled;
+        chrome.storage.local.set({ voiceCtrlEnabled: nextState }, () => {
+          if (nextState) {
+            voiceCtrlBtn.textContent = '🛑 Disable Voice Controller';
+            voiceCtrlBtn.style.background = '#f59e0b';
+            chrome.runtime.sendMessage({ action: 'ENABLE_VOICE_CONTROLLER' }, () => {
+              setStatus('Voice Controller v4.0 Active!');
+            });
+          } else {
+            voiceCtrlBtn.textContent = '🎙️ Enable Voice Controller v4.0';
+            voiceCtrlBtn.style.background = 'linear-gradient(135deg, #10b981, #06b6d4)';
+            chrome.runtime.sendMessage({ action: 'DISABLE_VOICE_CONTROLLER' }, () => {
+              setStatus('Voice Controller Disabled.');
+            });
+          }
+        });
+      });
+    });
+  }
 
   saveBtn.addEventListener('click', () => {
     const token = tokenInput.value.trim();

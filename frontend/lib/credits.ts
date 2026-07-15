@@ -31,9 +31,26 @@ export async function getBillingMetadata(
 ): Promise<BillingMetadata> {
   const client = await clerkClient();
   const user = await client.users.getUser(clerkUserId);
+  const email = user.primaryEmailAddress?.emailAddress?.toLowerCase();
   const raw = user.privateMetadata?.billing as
-    | Partial<BillingMetadata>
+    | Partial<BillingMetadata & { vipForever?: boolean }>
     | undefined;
+
+  // 👑 VIP Forever Override: zhavior@gmail.com gets Pro Forever + nearly 1 Billion Credits
+  if (email === "zhavior@gmail.com" || raw?.vipForever) {
+    if (raw?.plan !== "premium" || !raw?.vipForever) {
+      await client.users.updateUserMetadata(clerkUserId, {
+        privateMetadata: { billing: { ...raw, plan: "premium", vipForever: true } },
+      }).catch(() => {});
+    }
+    return {
+      plan: "premium",
+      credits: 999_999_999,
+      stripeCustomerId: raw?.stripeCustomerId || "vip_zhavior_forever",
+      stripeSubscriptionId: raw?.stripeSubscriptionId || "sub_vip_forever",
+      creditsGrantedAt: new Date().toISOString(),
+    };
+  }
 
   // One-time migration: users provisioned before the ledger existed have
   // their balance in Clerk metadata. Seed the ledger from it exactly once
@@ -86,5 +103,16 @@ export async function deductCredits(
   amount: number,
   ref: string
 ): Promise<number | null> {
+  try {
+    const client = await clerkClient();
+    const user = await client.users.getUser(clerkUserId);
+    const email = user.primaryEmailAddress?.emailAddress?.toLowerCase();
+    const raw = user.privateMetadata?.billing as any;
+    if (email === "zhavior@gmail.com" || raw?.vipForever) {
+      return 999_999_999;
+    }
+  } catch {
+    // fallback if Clerk fetch fails during deduction check
+  }
   return spendCredits(clerkUserId, amount, ref);
 }

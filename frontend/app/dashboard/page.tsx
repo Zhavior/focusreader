@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Card, CardContent } from "@/components/ui/card";
-import { Play, Loader2, Volume2, FastForward, Activity, Upload, Download, Chrome, BookOpen } from "lucide-react";
+import { Play, Loader2, Volume2, FastForward, Activity, Upload, Download, Chrome, BookOpen, Sparkles, Sliders } from "lucide-react";
 import TrackLibrary from "@/components/TrackLibrary";
 import KaraokePlayer from "@/components/KaraokePlayer";
 import { estimateLabel } from "@/lib/duration";
@@ -165,240 +165,264 @@ function DashboardContent() {
   };
 
   return (
-    <main className="relative min-h-screen bg-[#0b0d10] py-12 px-4 sm:px-6">
+    <main className="relative min-h-screen bg-[#0b0d10] py-12 px-4 sm:px-6 overflow-hidden">
+      {/* Fractal Noise Overlays for Sandblasted Titanium Texture */}
+      <div className="pointer-events-none fixed inset-0 z-50 opacity-[0.03] mix-blend-overlay" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }} />
 
-      <div className="max-w-3xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-1000 ease-out">
-            
-            {/* Header */}
-            <header className="flex items-start justify-between gap-4">
-              <div className="space-y-2">
-                <h1 className="text-3xl font-bold text-neutral-100 tracking-tight">Focus Studio</h1>
-                <p className="text-neutral-500">Paste text or upload a document, tune the dopamine, and hit play.</p>
-                {credits !== null && (
-                  <p className="text-xs text-neutral-600">
-                    <span className={overBudget ? "text-red-400" : "text-neutral-400"}>
-                      {charCount.toLocaleString()} chars
-                    </span>
-                    {charCount > 0 && (
-                      <span className="text-indigo-400/80">
-                        {" · ≈ "}
-                        {estimateLabel(charCount, speed[0])} at {speed[0].toFixed(1)}x
-                      </span>
-                    )}
-                    {" · "}
-                    <a href="/dashboard/billing" className="hover:text-indigo-300 transition-colors">
-                      {credits.toLocaleString()} credits left
-                      {plan === "free" && " — upgrade for 100k/mo"}
-                    </a>
-                  </p>
+      <div className="max-w-4xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-1000 ease-out relative z-10">
+        
+        {/* Apple-grade tactile header */}
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-white/5">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-neutral-300 text-xs font-semibold uppercase tracking-wider">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-500/20" /> Studio Dashboard
+            </div>
+            <h1 className="text-4xl font-extrabold text-white tracking-tight leading-none">Focus Studio</h1>
+            <p className="text-neutral-400 text-sm">Paste text or upload a document, tune the dopamine, and hit play.</p>
+            {credits !== null && (
+              <div className="flex items-center gap-2 text-xs font-medium text-neutral-500 mt-1">
+                <span className={overBudget ? "text-red-400" : "text-neutral-400"}>
+                  {charCount.toLocaleString()} characters
+                </span>
+                {charCount > 0 && (
+                  <span className="text-amber-400/80">
+                    {" • "}
+                    {estimateLabel(charCount, speed[0])} at {speed[0].toFixed(1)}x
+                  </span>
                 )}
+                <span>•</span>
+                <a href="/dashboard/billing" className="hover:text-white transition-colors underline decoration-white/20 underline-offset-2">
+                  {credits.toLocaleString()} credits left
+                  {plan === "free" && " (upgrade to Pro)"}
+                </a>
               </div>
-              <label className="flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-white/10 px-4 py-2.5 text-sm font-medium text-neutral-300 transition hover:border-indigo-500/50 hover:text-indigo-300">
-                {isUploading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Upload className="h-4 w-4" />
-                )}
-                {isUploading ? "Reading..." : "Upload PDF / DOCX"}
-                <input
-                  type="file"
-                  accept=".pdf,.docx,.txt,.md"
-                  className="hidden"
-                  onChange={handleUpload}
-                  disabled={isUploading}
-                />
-              </label>
-            </header>
+            )}
+          </div>
+          
+          <label className="flex shrink-0 items-center justify-center gap-2.5 rounded-full bg-[#161a1f] hover:bg-neutral-800 border border-white/10 px-6 py-3.5 text-sm font-bold text-white cursor-pointer transition-all hover:scale-105 active:scale-95 shadow-lg">
+            {isUploading ? (
+              <Loader2 className="h-4 w-4 animate-spin text-neutral-400" />
+            ) : (
+              <Upload className="h-4 w-4 text-neutral-400" />
+            )}
+            {isUploading ? "Uploading..." : "Upload Document"}
+            <input
+              type="file"
+              accept=".pdf,.docx,.txt,.md"
+              className="hidden"
+              onChange={handleUpload}
+              disabled={isUploading}
+            />
+          </label>
+        </header>
 
-            {/* Zhavior Document Studio Banner */}
-            <div className="relative group cursor-pointer mb-6" onClick={() => window.location.href = '/dashboard/reader'}>
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl blur opacity-30 group-hover:opacity-60 transition duration-500"></div>
-              <div className="relative flex flex-col sm:flex-row items-center justify-between bg-[#131619]/90 backdrop-blur-sm border border-purple-500/30 rounded-xl p-6 gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex shrink-0 items-center justify-center w-12 h-12 rounded-full bg-purple-500/20 text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.3)]">
-                    <BookOpen className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-bold text-white tracking-tight">Open Zhavior Document Studio</h3>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40">NEW 100/100</span>
-                    </div>
-                    <p className="text-sm text-neutral-400 mt-1 max-w-lg">
-                      <strong className="text-purple-300">Spatial XY-Cut PDF & DOCX Reader</strong> • Stereo Binaural Soundscapes • Exact Word Karaoke Sync • Bionic Reading • Instant Voice Notes.
-                    </p>
-                  </div>
+        {/* Feature Cards Grid (Studio & Extension) */}
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Zhavior Document Studio Card */}
+          <div 
+            onClick={() => router.push('/dashboard/reader')}
+            className="group relative flex flex-col justify-between bg-gradient-to-br from-[#161a1f] to-[#0f1115] border border-white/5 rounded-2xl p-6 gap-6 cursor-pointer hover:border-violet-500/40 hover:shadow-[0_0_30px_rgba(139,92,246,0.1)] transition-all duration-300 transform hover:-translate-y-1"
+          >
+            <div className="space-y-4">
+              <div className="w-12 h-12 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400 shadow-md">
+                <BookOpen className="w-6 h-6" />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-white tracking-tight group-hover:text-violet-300 transition-colors">Launch Document Studio</h3>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/40 uppercase">PRO</span>
                 </div>
-                <Button className="shrink-0 w-full sm:w-auto bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-full px-6 font-semibold shadow-[0_0_20px_-5px_rgba(168,85,247,0.6)] border border-purple-400/20">
-                  <BookOpen className="w-4 h-4 mr-2" />
-                  Launch Studio
-                </Button>
+                <p className="text-sm text-neutral-400 leading-relaxed">
+                  Advanced PDF & DOCX Bionic reader. Uses stereo spatial soundscapes, real-time karaoke synchronization, and hands-free layout modes.
+                </p>
               </div>
             </div>
-
-            {/* Chrome Extension Banner */}
-            <div className="relative group cursor-pointer" onClick={() => window.location.href = '/dashboard/tools'}>
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl blur opacity-30 group-hover:opacity-60 transition duration-500"></div>
-              <div className="relative flex flex-col sm:flex-row items-center justify-between bg-[#131619]/90 backdrop-blur-sm border border-white/10 rounded-xl p-6 gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex shrink-0 items-center justify-center w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
-                    <Chrome className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-white tracking-tight">Get the Zhavior Chrome Extension</h3>
-                    <p className="text-sm text-neutral-400 mt-1 max-w-lg">
-                      <strong className="text-indigo-300">Voice-Controlled AI Brain</strong> • Hands-Free Scrolling • Universal Media Sync • ADHD Bionic Text • Instantly push Voice Notes to your Dashboard.
-                    </p>
-                  </div>
-                </div>
-                <Button className="shrink-0 w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white rounded-full px-6 font-semibold shadow-[0_0_20px_-5px_rgba(59,130,246,0.5)] border border-blue-400/20">
-                  <Download className="w-4 h-4 mr-2" />
-                  Learn More
-                </Button>
-              </div>
-            </div>
-
-            {/* Main Editor */}
-            <div className="space-y-6">
-              <div className="relative group">
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 rounded-xl blur opacity-30 group-focus-within:opacity-100 transition duration-500"></div>
-                <Textarea 
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  placeholder="Paste your boring textbook or PDF text here..." 
-                  className="relative w-full min-h-[300px] resize-none bg-[#131619]/80 backdrop-blur-sm border-white/10 text-neutral-200 text-lg leading-relaxed p-6 rounded-xl focus-visible:ring-1 focus-visible:ring-indigo-500 transition-all"
-                />
-              </div>
-
-              {/* Dopamine Control Bar */}
-              <Card className="bg-[#131619] border-white/10">
-                <CardContent className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {/* Speed Control */}
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2 text-neutral-400">
-                        <FastForward className="w-4 h-4" />
-                        <span className="text-sm font-medium">Speed</span>
-                      </div>
-                      <span className="text-sm font-mono text-indigo-400">{speed[0].toFixed(1)}x</span>
-                    </div>
-                    <Slider
-                      value={speed}
-                      onValueChange={(value) =>
-                        setSpeed(Array.isArray(value) ? [...value] : [value])
-                      }
-                      min={1.0}
-                      max={3.0} 
-                      step={0.1}
-                      className="py-2"
-                    />
-                  </div>
-
-                  {/* Background Control */}
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-2 text-neutral-400">
-                      <Activity className="w-4 h-4" />
-                      <span className="text-sm font-medium">Background Layer</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(["silence", "brown_noise", "binaural"] as const).map((bg) => (
-                        <button
-                          key={bg}
-                          onClick={() => setBackground(bg)}
-                          className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${
-                            background === bg 
-                              ? "bg-indigo-500/20 border-indigo-500/50 text-indigo-300" 
-                              : "bg-transparent border-white/10 text-neutral-500 hover:text-neutral-300 hover:border-white/20"
-                          }`}
-                        >
-                          {bg === "silence" ? "Silence" : bg === "brown_noise" ? "Brown Noise" : "Binaural"}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Checkpoints */}
-                  <label className="md:col-span-2 flex items-center gap-3 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={checkpoints}
-                      onChange={(e) => setCheckpoints(e.target.checked)}
-                      className="h-4 w-4 rounded border-white/20 bg-transparent accent-indigo-500"
-                    />
-                    <span className="text-sm text-neutral-400">
-                      Checkpoints — spoken section markers every ~5 minutes
-                      {checkpointsApply ? "" : " (kicks in for longer texts)"}
-                    </span>
-                  </label>
-                </CardContent>
-              </Card>
-
-              {/* Error Message */}
-              {error && (
-                <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-                  {error}
-                </div>
-              )}
-
-              {/* Action Button & Player */}
-              <div className="flex flex-col items-center space-y-6 pt-4">
-                {audioUrl ? (
-                  <div className="w-full bg-[#131619] p-4 rounded-2xl border border-white/10 shadow-2xl space-y-3">
-                    <div className="flex items-center gap-2 text-indigo-400">
-                      <Volume2 className="w-4 h-4" />
-                      <span className="text-sm font-medium text-neutral-300">Read along</span>
-                    </div>
-                    <KaraokePlayer src={audioUrl} text={text} autoPlay />
-                  </div>
-                ) : (
-                  <Button 
-                    onClick={handleGenerate}
-                    disabled={isGenerating || !text.trim() || overBudget}
-                    className="w-full max-w-md h-16 text-lg font-bold bg-indigo-600 hover:bg-indigo-500 text-white rounded-full transition-all duration-300 shadow-[0_0_40px_-10px_rgba(99,102,241,0.4)] hover:shadow-[0_0_60px_-15px_rgba(99,102,241,0.6)] disabled:opacity-50 disabled:shadow-none"
-                  >
-                    {isGenerating ? (
-                      <>
-                        <Loader2 className="mr-3 h-6 w-6 animate-spin" />
-                        Generating Focus Track...
-                      </>
-                    ) : (
-                      <>
-                        <Play className="mr-3 h-6 w-6 fill-current" />
-                        Generate Audio
-                      </>
-                    )}
-                  </Button>
-                )}
-                
-                {audioUrl && (
-                  <div className="flex items-center gap-4">
-                    <a href={audioUrl} download="FocusMode.mp3">
-                      <Button 
-                        variant="outline" 
-                        className="border-indigo-500/50 text-indigo-300 hover:bg-indigo-500/10 hover:text-indigo-200 transition-colors"
-                      >
-                        <Download className="mr-2 h-4 w-4" />
-                        Download Audio
-                      </Button>
-                    </a>
-                    <Button 
-                      variant="ghost" 
-                      onClick={() => {
-                        setAudioUrl(null);
-                      }}
-                      className="text-neutral-500 hover:text-neutral-300"
-                    >
-                      Generate Another
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              {/* Track Library */}
-              <section className="pt-8">
-                <TrackLibrary refreshSignal={libraryVersion} />
-              </section>
+            <div className="inline-flex items-center text-sm font-bold text-violet-400 group-hover:text-violet-300 transition-colors pt-2">
+              Launch Studio →
             </div>
           </div>
+
+          {/* Chrome Extension Card */}
+          <div 
+            onClick={() => router.push('/dashboard/tools')}
+            className="group relative flex flex-col justify-between bg-gradient-to-br from-[#161a1f] to-[#0f1115] border border-white/5 rounded-2xl p-6 gap-6 cursor-pointer hover:border-blue-500/40 hover:shadow-[0_0_30px_rgba(59,130,246,0.1)] transition-all duration-300 transform hover:-translate-y-1"
+          >
+            <div className="space-y-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shadow-md">
+                <Chrome className="w-6 h-6" />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-white tracking-tight group-hover:text-blue-300 transition-colors">Chrome Extension</h3>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-400/40 uppercase">AUTO-LOGIN</span>
+                </div>
+                <p className="text-sm text-neutral-400 leading-relaxed">
+                  Bring dopamine Bionic Reading and voice-controlled web page navigation directly to any website you read.
+                </p>
+              </div>
+            </div>
+            <div className="inline-flex items-center text-sm font-bold text-blue-400 group-hover:text-blue-300 transition-colors pt-2">
+              Configure Extension →
+            </div>
+          </div>
+        </div>
+
+        {/* Main Editor & Settings */}
+        <div className="space-y-8">
+          
+          {/* Text Editor Glass Card */}
+          <div className="relative group">
+            <div className="absolute -inset-px bg-gradient-to-r from-neutral-800 to-neutral-700 rounded-3xl blur-sm opacity-20 group-focus-within:opacity-40 transition duration-300"></div>
+            <div className="relative bg-[#161a1f]/80 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-[#121518]/50">
+                <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400">Content Input</span>
+                <span className="text-xs font-mono text-neutral-500">{charCount.toLocaleString()} characters</span>
+              </div>
+              <Textarea 
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="Paste your textbook, article, or PDF text here to begin..." 
+                className="w-full min-h-[340px] resize-none bg-transparent border-0 text-neutral-200 text-lg leading-relaxed p-6 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none transition-all placeholder:text-neutral-600"
+              />
+            </div>
+          </div>
+
+          {/* Settings Panels Grid */}
+          <div className="grid md:grid-cols-2 gap-6">
+            
+            {/* Speed Panel */}
+            <div className="bg-[#161a1f]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-6 shadow-2xl flex flex-col justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-neutral-300 font-bold">
+                  <FastForward className="w-4 h-4 text-neutral-400" />
+                  <span>Playback Speed</span>
+                </div>
+                <p className="text-xs text-neutral-500">Tune the voice rate to match your focus level.</p>
+              </div>
+
+              <div className="space-y-4 pt-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-neutral-400 font-semibold">Speed Offset</span>
+                  <span className="text-sm font-bold font-mono text-amber-400">{speed[0].toFixed(1)}x</span>
+                </div>
+                <Slider
+                  value={speed}
+                  onValueChange={(value) =>
+                    setSpeed(Array.isArray(value) ? [...value] : [value])
+                  }
+                  min={1.0}
+                  max={3.0} 
+                  step={0.1}
+                  className="py-2"
+                />
+              </div>
+            </div>
+
+            {/* Background Soundscape Panel */}
+            <div className="bg-[#161a1f]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-6 shadow-2xl flex flex-col justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-neutral-300 font-bold">
+                  <Activity className="w-4 h-4 text-neutral-400" />
+                  <span>Background Soundscape</span>
+                </div>
+                <p className="text-xs text-neutral-500">Stereo frequencies designed to mute cognitive noise.</p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 pt-2">
+                {(["silence", "brown_noise", "binaural"] as const).map((bg) => (
+                  <button
+                    key={bg}
+                    onClick={() => setBackground(bg)}
+                    className={`px-3 py-3.5 text-xs font-bold rounded-xl border transition-all ${
+                      background === bg 
+                        ? "bg-white text-black border-white shadow-md scale-[1.02]" 
+                        : "bg-transparent border-white/10 text-neutral-400 hover:text-white hover:border-white/20"
+                    }`}
+                  >
+                    {bg === "silence" ? "Silence" : bg === "brown_noise" ? "Brown Noise" : "Binaural"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+          </div>
+
+          {/* Checkpoints Option */}
+          <div className="bg-[#161a1f]/30 border border-white/5 rounded-xl p-4 flex items-center justify-between">
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={checkpoints}
+                onChange={(e) => setCheckpoints(e.target.checked)}
+                className="h-4 w-4 rounded border-white/20 bg-transparent accent-white"
+              />
+              <span className="text-sm text-neutral-400 font-medium">
+                Include spoken section checkpoints every ~5 minutes
+                {checkpointsApply ? "" : " (triggers automatically for long content)"}
+              </span>
+            </label>
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+              {error}
+            </div>
+          )}
+
+          {/* Action Button & Player */}
+          <div className="flex flex-col items-center space-y-6 pt-4">
+            {audioUrl ? (
+              <div className="w-full bg-[#161a1f] p-6 rounded-2xl border border-white/10 shadow-2xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-neutral-300">
+                    <Volume2 className="w-4 h-4 text-amber-500" />
+                    <span className="text-sm font-bold">Synchronized Reader Player</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <a href={audioUrl} download="FocusTrack.mp3" className="text-xs font-bold text-neutral-400 hover:text-white transition-colors inline-flex items-center gap-1">
+                      <Download className="w-3.5 h-3.5" /> Download MP3
+                    </a>
+                    <span className="text-neutral-600">•</span>
+                    <button onClick={() => setAudioUrl(null)} className="text-xs font-bold text-neutral-500 hover:text-red-400 transition-colors">
+                      Discard
+                    </button>
+                  </div>
+                </div>
+                <KaraokePlayer src={audioUrl} text={text} autoPlay />
+              </div>
+            ) : (
+              <Button 
+                onClick={handleGenerate}
+                disabled={isGenerating || !text.trim() || overBudget}
+                className="w-full max-w-lg h-16 text-lg font-bold bg-white hover:bg-neutral-200 text-black rounded-full transition-all duration-300 shadow-[0_10px_35px_rgba(255,255,255,0.1)] active:scale-[0.98] disabled:opacity-30 disabled:pointer-events-none"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="mr-3 h-5 w-5 animate-spin text-black" />
+                    Generating Speech Track...
+                  </>
+                ) : (
+                  <>
+                    <Play className="mr-3 h-5 w-5 fill-current text-black" />
+                    Generate Audio
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+
+          {/* Track Library */}
+          <section className="pt-10 border-t border-white/5">
+            <div className="flex items-center gap-2 mb-6">
+              <Sliders className="w-5 h-5 text-neutral-400" />
+              <h2 className="text-xl font-bold text-white tracking-tight">Your Generated Library</h2>
+            </div>
+            <TrackLibrary refreshSignal={libraryVersion} />
+          </section>
+
+        </div>
+      </div>
     </main>
   );
 }

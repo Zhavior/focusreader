@@ -1,0 +1,83 @@
+name: Chrome Extension V3 Release & Bundling
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g. v3.0.3)'
+        required: true
+        default: 'v3.0.3'
+
+jobs:
+  bundle-and-release:
+    name: Package Manifest V3 Production & Dev Bundles
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine Version
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Build Directories
+        run: |
+          mkdir -p build/prod build/dev
+
+      - name: Build Production Extension Package (`hyperfi-extension-prod.zip`)
+        run: |
+          cp -r extension/* build/prod/
+          # Ensure production API URL in background.js, content.js, and gemini-voice.js
+          sed -i 's|http://localhost:4000|https://api.hyperfi.dev|g' build/prod/background.js build/prod/content.js build/prod/gemini-voice.js
+          sed -i 's|http://localhost:3001|https://app.hyperfi.dev|g' build/prod/background.js build/prod/content.js build/prod/gemini-voice.js
+          cd build/prod
+          zip -r ../../hyperfi-extension-prod-${{ steps.get_version.outputs.VERSION }}.zip ./*
+          cd ../..
+
+      - name: Build Development Extension Package (`hyperfi-extension-dev.zip`)
+        run: |
+          cp -r extension/* build/dev/
+          # Ensure local dev backend URLs
+          sed -i 's|https://api.hyperfi.dev|http://localhost:4000|g' build/dev/background.js build/dev/content.js build/dev/gemini-voice.js
+          sed -i 's|https://app.hyperfi.dev|http://localhost:3001|g' build/dev/background.js build/dev/content.js build/dev/gemini-voice.js
+          cd build/dev
+          zip -r ../../hyperfi-extension-dev-${{ steps.get_version.outputs.VERSION }}.zip ./*
+          cd ../..
+
+      - name: Upload Bundles as Action Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: chrome-extension-bundles-${{ steps.get_version.outputs.VERSION }}
+          path: |
+            hyperfi-extension-prod-*.zip
+            hyperfi-extension-dev-*.zip
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            hyperfi-extension-prod-*.zip
+            hyperfi-extension-dev-*.zip
+          body: |
+            ## HyperFi Chrome Extension Manifest V3 (${{ steps.get_version.outputs.VERSION }})
+            
+            ### Included Packages:
+            - **`hyperfi-extension-prod-${{ steps.get_version.outputs.VERSION }}.zip`**: Pre-configured for Production (`https://api.hyperfi.dev` & `https://app.hyperfi.dev`).
+            - **`hyperfi-extension-dev-${{ steps.get_version.outputs.VERSION }}.zip`**: Pre-configured for Local Development (`http://localhost:4000` & `http://localhost:3001`).
+            
+            ### Installation Instructions:
+            1. Download and unzip either `hyperfi-extension-prod-*.zip` or `hyperfi-extension-dev-*.zip`.
+            2. Open Google Chrome and navigate to `chrome://extensions`.
+            3. Enable **Developer mode** in the top right corner.
+            4. Click **Load unpacked** and select the unzipped directory.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

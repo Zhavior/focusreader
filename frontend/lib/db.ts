@@ -82,6 +82,20 @@ function createDb(): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS idx_notes_user ON notes(user_id, created_at DESC);
 
+    CREATE TABLE IF NOT EXISTS reader_docs (
+      id          TEXT PRIMARY KEY,
+      user_id     TEXT NOT NULL,
+      title       TEXT NOT NULL,
+      doc_type    TEXT NOT NULL DEFAULT 'pdf',
+      num_pages   INTEGER NOT NULL DEFAULT 1,
+      current_page INTEGER NOT NULL DEFAULT 1,
+      current_chunk INTEGER NOT NULL DEFAULT 0,
+      total_words INTEGER NOT NULL DEFAULT 0,
+      created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+      updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_reader_docs_user ON reader_docs(user_id, updated_at DESC);
+
     CREATE TABLE IF NOT EXISTS imports (
       id          TEXT PRIMARY KEY,
       text        TEXT NOT NULL,
@@ -501,3 +515,59 @@ export function revokeExtensionTokens(userId: string): void {
 export function getImport(id: string): Import | undefined {
   return getDb().prepare(`SELECT * FROM imports WHERE id = ?`).get(id) as Import | undefined;
 }
+
+export interface ReaderDoc {
+  id: string;
+  user_id: string;
+  title: string;
+  doc_type: "pdf" | "docx";
+  num_pages: number;
+  current_page: number;
+  current_chunk: number;
+  total_words: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function createReaderDoc(params: {
+  id?: string;
+  userId: string;
+  title: string;
+  docType: "pdf" | "docx";
+  numPages: number;
+  totalWords: number;
+}): Promise<ReaderDoc> {
+  const id = params.id || crypto.randomUUID();
+  const db = getDb();
+  db.prepare(
+    `INSERT OR REPLACE INTO reader_docs (id, user_id, title, doc_type, num_pages, current_page, current_chunk, total_words, updated_at)
+     VALUES (?, ?, ?, ?, ?, 1, 0, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))`
+  ).run(id, params.userId, params.title, params.docType, params.numPages, params.totalWords);
+  const doc = db.prepare(`SELECT * FROM reader_docs WHERE id = ? AND user_id = ?`).get(id, params.userId) as ReaderDoc;
+
+  return doc;
+}
+
+export async function listReaderDocs(userId: string, limit = 50): Promise<ReaderDoc[]> {
+  return getDb()
+    .prepare(`SELECT * FROM reader_docs WHERE user_id = ? ORDER BY updated_at DESC LIMIT ?`)
+    .all(userId, limit) as ReaderDoc[];
+}
+
+export async function updateReaderDocProgress(id: string, userId: string, currentPage: number, currentChunk: number): Promise<void> {
+  getDb()
+    .prepare(
+      `UPDATE reader_docs SET current_page = ?, current_chunk = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+       WHERE id = ? AND user_id = ?`
+    )
+    .run(currentPage, currentChunk, id, userId);
+}
+
+export async function deleteReaderDoc(id: string, userId: string): Promise<boolean> {
+  const info = getDb()
+    .prepare(`DELETE FROM reader_docs WHERE id = ? AND user_id = ?`)
+    .run(id, userId);
+
+  return info.changes > 0;
+}
+

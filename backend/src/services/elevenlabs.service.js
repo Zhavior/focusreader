@@ -15,7 +15,7 @@ class ElevenLabsError extends Error {
  * Requests a streamed MP3 for a single text chunk from ElevenLabs.
  * Returns a Node Readable stream of raw audio bytes.
  */
-async function streamChunkAudio({ text, voiceId, modelId, apiKey }) {
+async function streamChunkAudio({ text, voiceId, modelId, apiKey, signal }) {
   const url = `${ELEVENLABS_BASE_URL}/text-to-speech/${voiceId}/stream`;
 
   try {
@@ -24,6 +24,7 @@ async function streamChunkAudio({ text, voiceId, modelId, apiKey }) {
       url,
       responseType: "stream",
       timeout: 30000,
+      signal,
       headers: {
         "xi-api-key": apiKey,
         "Content-Type": "application/json",

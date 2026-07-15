@@ -16,7 +16,7 @@ export default function Footer() {
               <div className="h-6 w-6 rounded-full bg-indigo-600 flex items-center justify-center shadow-[0_0_14px_rgba(99,102,241,0.6)]">
                 <Brain className="h-3 w-3 text-white" />
               </div>
-              <span className="font-extrabold tracking-tight text-white antialiased text-lg">FocusReader</span>
+              <span className="font-extrabold tracking-tight text-white antialiased text-lg">Hyperfi</span>
             </Link>
             <p className="text-sm text-neutral-300 font-medium leading-relaxed antialiased">
               Neuro-inclusive audio generation. Designed to help you stop drifting and start finishing.
@@ -25,10 +25,12 @@ export default function Footer() {
 
           {/* Policy */}
           <div className="space-y-4">
-            <h4 className="font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-neutral-500 antialiased text-lg tracking-tight">Legal</h4>
-            <ul className="space-y-2 text-sm">
-              <li><Link href="/privacy" className="text-neutral-400 hover:text-white transition-colors font-semibold antialiased tracking-wide">Privacy Policy</Link></li>
-              <li><Link href="/terms" className="text-neutral-400 hover:text-white transition-colors font-semibold antialiased tracking-wide">Terms of Service</Link></li>
+            <h4 className="font-bold text-white antialiased text-base tracking-tight">Product</h4>
+            <ul className="space-y-2.5 text-sm">
+              <li><Link href="/#pricing" className="text-neutral-400 hover:text-white transition-colors font-medium">Pricing Tiers (`$19.99`)</Link></li>
+              <li><Link href="/dashboard" className="text-neutral-400 hover:text-white transition-colors font-medium">Focus Document Studio</Link></li>
+              <li><Link href="/privacy" className="text-neutral-400 hover:text-white transition-colors font-medium">Privacy Policy</Link></li>
+              <li><Link href="/terms" className="text-neutral-400 hover:text-white transition-colors font-medium">Terms of Service</Link></li>
             </ul>
           </div>
 
@@ -74,7 +76,7 @@ export default function Footer() {
 
         <div className="mt-16 pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-xs text-neutral-500 font-semibold antialiased tracking-wide">
-            © {new Date().getFullYear()} FocusReader. All rights reserved.
+            © {new Date().getFullYear()} Hyperfi. All rights reserved.
           </p>
         </div>
       </div>

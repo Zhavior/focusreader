@@ -19,6 +19,12 @@ export default function ExtensionPage() {
   const [generating, setGenerating] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
 
+  // Sync token from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem("zhavior_ext_token");
+    if (stored) setToken(stored);
+  }, []);
+
   // Plan gating state
   const [plan, setPlan] = useState<"free" | "premium" | null>(null);
   const [isLoadingPlan, setIsLoadingPlan] = useState(true);
@@ -42,7 +48,10 @@ export default function ExtensionPage() {
     try {
       const res = await fetch("/api/extension-token", { method: "POST" });
       const data = await res.json();
-      if (res.ok && data.token) setToken(data.token);
+      if (res.ok && data.token) {
+        setToken(data.token);
+        localStorage.setItem("zhavior_ext_token", data.token);
+      }
     } finally {
       setGenerating(false);
     }
@@ -83,10 +92,10 @@ export default function ExtensionPage() {
               <Sparkles className="w-3.5 h-3.5" /> Upgraded Feature Only
             </div>
             <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-              Zhavior Pro Tools & Extension <span className="text-amber-400">Are Locked</span>
+              Hyperfi Pro Tools & Extension <span className="text-amber-400">Are Locked</span>
             </h1>
             <p className="text-neutral-400 text-base sm:text-lg leading-relaxed max-w-xl mx-auto">
-              The **Zhavior Chrome Extension**, **Voice-Controlled AI Brain**, **Universal Media Sync**, and **Advanced Token Access** are exclusive to **Upgraded Pro** members.
+              The **Hyperfi Chrome Extension**, **Voice-Controlled AI Brain**, **Universal Media Sync**, and **Advanced Token Access** are exclusive to **Upgraded Pro** members.
             </p>
           </div>
 
@@ -115,7 +124,7 @@ export default function ExtensionPage() {
               className="w-full sm:w-auto h-14 px-8 text-base font-bold bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black rounded-full shadow-[0_0_35px_rgba(245,158,11,0.4)] transform hover:scale-105 transition-all"
             >
               <Zap className="w-5 h-5 mr-2 fill-current" />
-              Upgrade to Pro ($19/mo) — Unlock All Tools
+              Upgrade to Pro — $19.99/mo Beta Price
             </Button>
             <Link href="/dashboard" className="text-sm font-semibold text-neutral-400 hover:text-white transition-colors py-2">
               Back to Dashboard
@@ -150,7 +159,7 @@ export default function ExtensionPage() {
             <Chrome className="w-10 h-10" />
           </div>
           <h1 className="text-4xl md:text-5xl font-extrabold text-white tracking-tight">
-            The Zhavior <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">Chrome Extension</span>
+            The Hyperfi <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">Chrome Extension</span>
           </h1>
           <p className="text-xl text-neutral-400 max-w-2xl mx-auto">
             Bring the dopamine-optimized reading experience to any website. Control your browser entirely with your voice.
@@ -213,11 +222,11 @@ export default function ExtensionPage() {
         {/* CTA */}
         <div className="flex flex-col items-center pt-8 pb-20">
           <Button 
-            onClick={() => window.location.href = '/focusreader-extension.zip'}
+            onClick={() => window.location.href = '/hyperfi-extension.zip'}
             className="h-16 px-12 text-lg font-bold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-full transition-all duration-300 shadow-[0_0_40px_-10px_rgba(59,130,246,0.4)] hover:shadow-[0_0_60px_-15px_rgba(59,130,246,0.6)]"
           >
             <Download className="mr-3 h-6 w-6" />
-            Download Zhavior Extension (.zip)
+            Download Hyperfi Extension (.zip)
           </Button>
 
           <button 

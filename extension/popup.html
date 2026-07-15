@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Zhavior FocusReader</title>
+  <title>Hyperfi Reader</title>
   <style>
     body {
       width: 280px;
@@ -88,16 +88,17 @@
   </style>
 </head>
 <body>
-  <h1>Zhavior</h1>
+  <h1>Hyperfi</h1>
   
   <div id="loginState">
-    <p>Enter your Access Token from the Zhavior Tools Dashboard.</p>
+    <p>Enter your Access Token from the Hyperfi Tools Dashboard.</p>
     <input type="password" id="tokenInput" placeholder="frk_..." />
     <button id="saveBtn">Log In</button>
   </div>
 
   <div id="loggedInState">
     <p>You're logged in! Look for the floating <b>Focus</b> pill on any article — click it to start a session.</p>
+    <button id="voiceCtrlBtn" style="background: linear-gradient(135deg, #10b981, #06b6d4); margin-bottom: 10px; box-shadow: 0 4px 15px -3px rgba(16, 185, 129, 0.4);">🎙️ Enable Voice Controller v4.0</button>
     <button id="logoutBtn" style="background: #ef4444; box-shadow: none;">Log Out</button>
   </div>
 
@@ -105,6 +106,7 @@
 
   <div id="statusMsg" class="status"></div>
   
+  <script src="config.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

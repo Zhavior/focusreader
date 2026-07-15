@@ -3,14 +3,35 @@
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Wrench, CreditCard, Star } from "lucide-react";
+import { LayoutDashboard, Wrench, CreditCard, Star, BookOpen } from "lucide-react";
+import { useState, useEffect } from "react";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
+  const [token, setToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const storedToken = localStorage.getItem("zhavior_ext_token");
+    if (storedToken) {
+      setToken(storedToken);
+      return;
+    }
+
+    // Auto-generate extension token on first log in if none exists
+    fetch("/api/extension-token", { method: "POST" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.token) {
+          localStorage.setItem("zhavior_ext_token", data.token);
+          setToken(data.token);
+        }
+      })
+      .catch((err) => console.error("Error auto-generating token:", err));
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#0b0d10] flex flex-col">
@@ -21,10 +42,10 @@ export default function DashboardLayout({
           {/* Logo */}
           <div className="flex items-center gap-2">
             <Link href="/dashboard" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                <span className="text-white font-bold text-lg leading-none tracking-tighter">Z</span>
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-violet-500/20">
+                <span className="text-white font-bold text-lg leading-none tracking-tighter">H</span>
               </div>
-              <span className="text-white font-bold text-lg tracking-tight hidden sm:block">Zhavior</span>
+              <span className="text-white font-bold text-lg tracking-tight hidden sm:block">Hyperfi</span>
             </Link>
           </div>
 
@@ -38,6 +59,17 @@ export default function DashboardLayout({
               <LayoutDashboard className="w-4 h-4" />
               <span className="hidden sm:inline">Studio</span>
             </Link>
+
+            <Link href="/dashboard/reader" className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full text-sm font-medium transition-all ${
+              pathname.includes("/dashboard/reader")
+                ? "bg-purple-500/20 text-purple-300 border border-purple-500/40" 
+                : "text-neutral-400 hover:text-purple-300 hover:bg-purple-500/10"
+            }`}>
+              <BookOpen className="w-4 h-4 text-purple-400" />
+              <span>Document Studio</span>
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-gradient-to-tr from-purple-500 to-cyan-400 text-white leading-none">PRO</span>
+            </Link>
+
 
             <Link href="/dashboard/tools" className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full text-sm font-medium transition-all ${
               pathname.includes("/dashboard/tools")
@@ -71,6 +103,16 @@ export default function DashboardLayout({
       <div className="flex-1">
         {children}
       </div>
+      {/* Extension Authentication Bridge */}
+      {token && (
+        <div 
+          id="fr-auth-bridge" 
+          data-token={token} 
+          data-api-base={typeof window !== "undefined" ? window.location.origin : ""}
+          data-tts-base={process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000"}
+          style={{ display: "none" }} 
+        />
+      )}
     </div>
   );
 }

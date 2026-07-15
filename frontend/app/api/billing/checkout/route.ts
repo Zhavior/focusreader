@@ -5,10 +5,18 @@ import { getBillingMetadata } from "@/lib/credits";
 
 export const runtime = "nodejs";
 
-export async function POST() {
+export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  }
+
+  let priceId: string | undefined;
+  try {
+    const body = await req.json();
+    priceId = body?.priceId || body?.tier;
+  } catch {
+    // No body or not JSON
   }
 
   try {
@@ -20,6 +28,7 @@ export async function POST() {
       clerkUserId: userId,
       customerEmail: user.primaryEmailAddress?.emailAddress,
       existingStripeCustomerId: billing.stripeCustomerId,
+      priceId,
     });
 
     return NextResponse.json({ url });
