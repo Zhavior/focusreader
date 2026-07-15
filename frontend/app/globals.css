@@ -53,41 +53,42 @@
   --color-surface-border: #22262b;
   --color-brand: #7c5cff;
   --color-brand-hover: #8f72ff;
+  --color-brand-cyan: #00e5ff;
 }
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: oklch(0.556 0 0);
 }
 
 .dark {
@@ -106,7 +107,7 @@
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
+  --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
   --chart-1: oklch(0.87 0 0);
@@ -120,34 +121,42 @@
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-border: oklch(1 0 0 / 12%);
   --sidebar-ring: oklch(0.556 0 0);
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    border-color: var(--border);
+    outline-color: rgba(140, 140, 140, 0.5);
   }
   body {
-    @apply bg-background text-foreground;
+    background-color: #0b0d10;
+    color: #f1f3f5;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   html {
-    @apply font-sans;
+    font-family: var(--font-sans), sans-serif;
     color-scheme: dark;
   }
 }
 
-::-webkit-scrollbar {
-  width: 10px;
+/* ─── ADHD-Friendly Micro-Animations & Tactile Feedback ─────────────────────── */
+
+@keyframes adhd-pulse {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(124, 92, 255, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 28px rgba(124, 92, 255, 0.45), inset 0 1px 2px rgba(255, 255, 255, 0.2);
+  }
 }
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background-color: #22262b;
-  border-radius: 9999px;
+@keyframes float-gentle {
+  0%, 100% { transform: translateY(0px) translateZ(0); }
+  50% { transform: translateY(-6px) translateZ(0); }
 }
 
 @keyframes rainbow {
@@ -156,3 +165,109 @@
   100% { background-position: 0% 50%; }
 }
 
+.adhd-pulse-glow {
+  animation: adhd-pulse 3.5s infinite ease-in-out;
+}
+
+.adhd-float {
+  animation: float-gentle 5s infinite ease-in-out;
+  will-change: transform;
+}
+
+/* Sandblasted Brushed Titanium Card */
+.glass-titanium {
+  background: linear-gradient(145deg, rgba(24, 27, 34, 0.85) 0%, rgba(13, 15, 19, 0.95) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.06);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-titanium:hover {
+  border-color: rgba(124, 92, 255, 0.35);
+  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.55), 0 0 20px rgba(124, 92, 255, 0.12), inset 0 1px 2px rgba(255, 255, 255, 0.12);
+  transform: translateY(-2px) translateZ(0);
+}
+
+.glass-titanium-interactive {
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-titanium-interactive:active {
+  transform: scale(0.985) translateZ(0);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+}
+
+/* Tactile Pill Buttons */
+.tactile-pill {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9999px;
+  transition: all 0.2s ease;
+}
+
+.tactile-pill:hover {
+  background: linear-gradient(135deg, rgba(124, 92, 255, 0.2) 0%, rgba(124, 92, 255, 0.08) 100%);
+  border-color: rgba(124, 92, 255, 0.4);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+/* Bionic & Karaoke Highlighting for ADHD Focus */
+.adhd-bionic-stem {
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow: 0 0 1px rgba(255, 255, 255, 0.5);
+  letter-spacing: -0.01em;
+}
+
+.adhd-karaoke-word {
+  display: inline-block;
+  padding: 1px 5px;
+  margin: 0 1px;
+  border-radius: 6px;
+  transition: all 120ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, background-color;
+}
+
+.adhd-karaoke-word.active {
+  background: linear-gradient(135deg, rgba(255, 214, 0, 0.35) 0%, rgba(255, 145, 0, 0.25) 100%);
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 0 12px rgba(255, 214, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.25);
+  transform: scale(1.06) translateZ(0);
+}
+
+/* GPU-accelerated page transitions and smooth scrolling for Document Studio */
+.reader-viewport-container {
+  scroll-behavior: smooth;
+  will-change: scroll-position;
+}
+
+.reader-page-item {
+  transform: translateZ(0);
+  will-change: transform, opacity;
+  content-visibility: auto;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(11, 13, 16, 0.8);
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+  border: 2px solid #0b0d10;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(124, 92, 255, 0.4);
+}
