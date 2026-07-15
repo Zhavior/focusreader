@@ -7,8 +7,8 @@ import { ClerkProvider } from "@clerk/nextjs";
 const outfit = Outfit({ subsets: ['latin'], variable: '--font-sans' });
 
 export const metadata: Metadata = {
-  title: "Hyperfi — High-Fidelity Focus for the ADHD Brain",
-  description: "Neural-voiced audio for PDFs, articles & textbooks. Built for hyperfocus.",
+  title: "FocusReader — Turn Dense Reading Into Audio",
+  description: "Turn PDFs, articles, and textbooks into calm, focused audio sessions designed to help you finish what you start.",
 };
 
 

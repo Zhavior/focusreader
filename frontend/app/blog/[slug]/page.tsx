@@ -19,7 +19,7 @@ export async function generateMetadata({
   const post = loadPost(slug);
   if (!post) return {};
   return {
-    title: `${post.title} | Hyperfi`,
+    title: `${post.title} | FocusReader`,
     description: post.description,
     keywords: post.keyword,
     openGraph: {

@@ -6,7 +6,7 @@ import { listPosts } from "@/lib/blog";
 export const dynamic = "force-static";
 
 export const metadata: Metadata = {
-  title: "The Hyperfi Blog — Finish Your Reading",
+  title: "The FocusReader Blog — Finish Your Reading",
   description:
     "ADHD-friendly reading strategies, honest tool comparisons, and the science of actually finishing what you start.",
 };
