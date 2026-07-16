@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "functions": {
+    "/api/billing/checkout": {},
+    "/api/credits": {},
+    "/api/extension-import": {},
+    "/api/extension-import/[id]": {},
+    "/api/extension-vault": {},
+    "/api/extension-tts": {},
+    "/api/extension-token": {},
+    "/api/extract": {},
+    "/api/jobs": {},
+    "/api/jobs/[id]": {},
+    "/api/tracks/[id]/audio": {},
+    "/api/tracks/[id]": {},
+    "/api/reader-docs": {},
+    "/api/webhooks/stripe": {},
+    "/api/tracks": {},
+    "/api/tts": {},
+    "/api/extension-notes": {},
+    "/api/billing/portal": {}
+  }
+}
