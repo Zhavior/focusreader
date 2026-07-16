@@ -46,7 +46,7 @@ export default function DocumentStudioPage() {
   const [isBionic, setIsBionic] = useState<boolean>(false);
 
   // 4. Studio Soundscapes & Notes State
-  const [noiseIdx, setNoiseIdx] = useState<number>(0);
+  const [noiseIdx, setNoiseIdx] = useState<number>(1);
   const [noiseVolume, setNoiseVolume] = useState<number>(0.15);
   const [savedNotes, setSavedNotes] = useState<{ text: string; page: number; time: string }[]>([]);
 
@@ -88,9 +88,14 @@ export default function DocumentStudioPage() {
 
   // WebAudio Soundscape Engine Generator
   useEffect(() => {
-    if (noiseIdx === 0) {
+    if (noiseIdx === 0 || !isPlaying) {
       if (noiseGainRef.current && audioCtxRef.current) {
-        try { noiseGainRef.current.gain.setValueAtTime(0, audioCtxRef.current.currentTime); } catch {}
+        try {
+          noiseGainRef.current.gain.setValueAtTime(
+            0,
+            audioCtxRef.current.currentTime
+          );
+        } catch {}
       }
       return;
     }
@@ -143,7 +148,7 @@ export default function DocumentStudioPage() {
     return () => {
       try { source.stop(); source.disconnect(); } catch {}
     };
-  }, [noiseIdx]);
+  }, [noiseIdx, isPlaying]);
 
   useEffect(() => {
     if (noiseGainRef.current && audioCtxRef.current && noiseIdx !== 0) {
