@@ -1,7 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { buildWordTimings, wordIndexAt } from "@/lib/karaoke";
+import {
+  FOCUS_SOUNDSCAPE_PRESETS,
+  FocusSoundscapeEngine,
+  type FocusSoundscapeId,
+} from "@/lib/audio/FocusSoundscapeEngine";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRight,
@@ -51,6 +57,53 @@ const trustPoints = [
   "Sound and motion stay under your control.",
 ];
 
+const comparisonRows = [
+  {
+    feature: "Spoken-word follow-along",
+    focusReader: "Built into the reader",
+    basicTts: "Usually audio only",
+  },
+  {
+    feature: "Focus soundscapes",
+    focusReader: "Built in and optional",
+    basicTts: "Not typically included",
+  },
+  {
+    feature: "Distraction-light reading view",
+    focusReader: "Core experience",
+    basicTts: "Not the main focus",
+  },
+  {
+    feature: "Upload-to-listen workflow",
+    focusReader: "PDFs, articles, and study material",
+    basicTts: "Varies by tool",
+  },
+];
+
+const landingPlans = [
+  {
+    name: "Monthly",
+    price: "$19.99",
+    detail: "per month",
+    note: "100,000 characters each month",
+    badge: null,
+  },
+  {
+    name: "6 months",
+    price: "$89.99",
+    detail: "billed once",
+    note: "About $15/month · Save 25%",
+    badge: "Popular",
+  },
+  {
+    name: "2 years",
+    price: "$199.99",
+    detail: "billed once",
+    note: "About $8.33/month · Save 58%",
+    badge: "Best value",
+  },
+];
+
 function PrimaryAction({ signedIn }: { signedIn: boolean }) {
   const className =
     "group inline-flex min-h-12 items-center justify-center gap-2 rounded-md bg-white px-6 text-sm font-medium text-black transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-4 focus-visible:ring-offset-black";
@@ -83,12 +136,222 @@ function PrimaryAction({ signedIn }: { signedIn: boolean }) {
   );
 }
 
+function PricingAction({
+  signedIn,
+  label,
+}: {
+  signedIn: boolean;
+  label: string;
+}) {
+  const className =
+    "inline-flex min-h-11 w-full items-center justify-center rounded-md border border-white/15 bg-white px-5 text-sm font-semibold text-black transition hover:scale-[0.99] hover:bg-[#e9eee8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white";
+
+  if (signedIn) {
+    return (
+      <Link href="/dashboard/billing" className={className}>
+        {label}
+      </Link>
+    );
+  }
+
+  return (
+    <SignUpButton mode="modal" fallbackRedirectUrl="/dashboard/billing">
+      <button type="button" className={className}>
+        {label}
+      </button>
+    </SignUpButton>
+  );
+}
+
+const DEMO_TEXT =
+  "Reading takes more than recognizing words. It requires holding your place, filtering distractions, and returning when attention moves. FocusReader turns dense material into clear narration while keeping the current passage visible, so you can stay oriented and continue without starting over.";
+
 function ReaderPreview() {
   const [playing, setPlaying] = useState(false);
+  const [selectedSoundscape, setSelectedSoundscape] =
+    useState<FocusSoundscapeId | null>("deep-brown");
+  const [duration, setDuration] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const wordsRef = useRef<HTMLDivElement | null>(null);
+  const progressBarRef = useRef<HTMLDivElement | null>(null);
+  const elapsedRef = useRef<HTMLSpanElement | null>(null);
+  const karaokeFrameRef = useRef<number | null>(null);
+  const soundscapeEngineRef = useRef<FocusSoundscapeEngine | null>(null);
+  const selectedSoundscapeRef = useRef<FocusSoundscapeId | null>(
+    "deep-brown"
+  );
+  const demoTokens = useMemo(() => buildWordTimings(DEMO_TEXT), []);
+
+  const getSoundscapeEngine = () => {
+    if (!soundscapeEngineRef.current) {
+      soundscapeEngineRef.current = new FocusSoundscapeEngine();
+    }
+
+    return soundscapeEngineRef.current;
+  };
+
+  const stopSoundscape = () => {
+    soundscapeEngineRef.current?.stop();
+  };
+
+  const startSoundscape = async () => {
+    const preset = selectedSoundscapeRef.current;
+    if (!preset) return;
+
+    await getSoundscapeEngine().play(preset);
+  };
+
+  const stopKaraoke = () => {
+    if (karaokeFrameRef.current !== null) {
+      cancelAnimationFrame(karaokeFrameRef.current);
+      karaokeFrameRef.current = null;
+    }
+  };
+
+  const startKaraoke = () => {
+    stopKaraoke();
+
+    let lastWordIndex = -1;
+
+    const step = () => {
+      const audio = audioRef.current;
+
+      if (!audio || audio.paused || audio.ended) {
+        karaokeFrameRef.current = null;
+        return;
+      }
+
+      const validDuration =
+        Number.isFinite(audio.duration) && audio.duration > 0
+          ? audio.duration
+          : 0;
+
+      if (validDuration > 0) {
+        const fraction = Math.min(
+          1,
+          Math.max(0, audio.currentTime / validDuration)
+        );
+
+        const nextWordIndex = wordIndexAt(demoTokens, fraction);
+
+        if (nextWordIndex !== lastWordIndex) {
+          const previousWord =
+            lastWordIndex >= 0
+              ? wordsRef.current?.querySelector<HTMLElement>(
+                  `[data-word-index="${lastWordIndex}"]`
+                )
+              : null;
+
+          const nextWord = wordsRef.current?.querySelector<HTMLElement>(
+            `[data-word-index="${nextWordIndex}"]`
+          );
+
+          previousWord?.classList.remove("active");
+          nextWord?.classList.add("active");
+          lastWordIndex = nextWordIndex;
+        }
+
+        if (progressBarRef.current) {
+          progressBarRef.current.style.transform =
+            `scaleX(${Math.max(fraction, 0.02)})`;
+        }
+
+        if (elapsedRef.current) {
+          elapsedRef.current.textContent = formatTime(audio.currentTime);
+        }
+      }
+
+      karaokeFrameRef.current = requestAnimationFrame(step);
+    };
+
+    karaokeFrameRef.current = requestAnimationFrame(step);
+  };
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const syncMetadata = () => {
+      setDuration(Number.isFinite(audio.duration) ? audio.duration : 0);
+    };
+
+    const handlePlay = () => {
+      setPlaying(true);
+      startKaraoke();
+      void startSoundscape();
+    };
+
+    const handlePause = () => {
+      setPlaying(false);
+      stopKaraoke();
+      stopSoundscape();
+    };
+
+    const handleEnded = () => {
+      stopKaraoke();
+      stopSoundscape();
+      setPlaying(false);
+
+      wordsRef.current
+        ?.querySelectorAll<HTMLElement>("[data-word-index].active")
+        .forEach((word) => word.classList.remove("active"));
+
+      audio.currentTime = 0;
+
+      if (progressBarRef.current) {
+        progressBarRef.current.style.transform = "scaleX(0.02)";
+      }
+
+      if (elapsedRef.current) {
+        elapsedRef.current.textContent = "0:00";
+      }
+    };
+
+    audio.addEventListener("loadedmetadata", syncMetadata);
+    audio.addEventListener("play", handlePlay);
+    audio.addEventListener("pause", handlePause);
+    audio.addEventListener("ended", handleEnded);
+
+    return () => {
+      stopKaraoke();
+      stopSoundscape();
+      void soundscapeEngineRef.current?.dispose();
+      soundscapeEngineRef.current = null;
+      audio.removeEventListener("loadedmetadata", syncMetadata);
+      audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener("pause", handlePause);
+      audio.removeEventListener("ended", handleEnded);
+    };
+  }, [demoTokens]);
+
+  const toggleAudio = async () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (audio.paused) {
+      try {
+        await audio.play();
+        setPlaying(true);
+      } catch {
+        setPlaying(false);
+      }
+    } else {
+      audio.pause();
+      setPlaying(false);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    if (!Number.isFinite(seconds)) return "0:00";
+    const minutes = Math.floor(seconds / 60);
+    const remaining = Math.floor(seconds % 60);
+    return `${minutes}:${remaining.toString().padStart(2, "0")}`;
+  };
 
   return (
     <div className="relative mx-auto w-full max-w-[620px]">
-      <div className="absolute -inset-16 -z-10 rounded-full bg-white/[0.02] blur-3xl" />
+      <audio ref={audioRef} preload="metadata" src="/audio/focusreader-demo.mp3" />
+      <div className="absolute -inset-16 -z-10 rounded-full bg-[rgba(157,179,155,0.065)] blur-3xl" />
 
       <div className="overflow-hidden rounded-lg border border-white/10 bg-[#0d0e11]/96 shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-3xl translate-z-0">
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-4 sm:px-6">
@@ -121,30 +384,41 @@ function ReaderPreview() {
               How working memory shapes sustained attention
             </h3>
 
-            <div className="mt-7 rounded-lg border border-white/10 bg-black/15 p-4 text-sm leading-7 text-[#91959f]">
-              Working memory helps us hold and organize information while
-              completing a task. When cognitive load rises,
-              <span className="rounded bg-[#d9d7cf] px-1.5 py-0.5 font-medium text-[#111216]">
-                {" "}
-                clear structure can reduce the effort required to stay oriented.
-              </span>
+            <div
+              ref={wordsRef}
+              className="mt-7 rounded-lg border border-white/10 bg-black/15 p-4 text-sm leading-7 text-[#91959f]"
+              aria-label={DEMO_TEXT}
+            >
+              {demoTokens.map((token, index) => (
+                <span key={`${token.word}-${index}`}>
+                  <span
+                    data-word-index={index}
+                    className="landing-karaoke-word inline rounded px-0.5 text-[#a6a9b1]"
+                  >
+                    {token.word}
+                  </span>{" "}
+                </span>
+              ))}
             </div>
 
             <div className="mt-6">
               <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.08]">
-                <div className="h-full w-[38%] rounded-full bg-[#d9d7cf]" />
+                <div
+                  ref={progressBarRef}
+                  className="h-full origin-left scale-x-[0.02] rounded-full bg-[#9db39b] shadow-[0_0_18px_rgba(157,179,155,0.18)] will-change-transform"
+                />
               </div>
               <div className="mt-2 flex justify-between text-[11px] text-[#6f737d]">
-                <span>08:42</span>
-                <span>22:18</span>
+                <span ref={elapsedRef}>0:00</span>
+                <span>{formatTime(duration)}</span>
               </div>
             </div>
 
             <div className="mt-5 flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setPlaying((value) => !value)}
-                aria-label={playing ? "Pause interface preview" : "Play interface preview"}
+                onClick={toggleAudio}
+                aria-label={playing ? "Pause audio sample" : "Play audio sample"}
                 className="flex h-12 w-12 items-center justify-center rounded-full bg-[#efeee9] text-[#111216] transition hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
                 {playing ? (
@@ -155,37 +429,123 @@ function ReaderPreview() {
               </button>
               <div>
                 <p className="text-sm font-medium text-[#e2e1dc]">
-                  {playing ? "Previewing player state" : "Interface preview paused"}
+                  {playing ? "Playing audio sample" : "Hear a short sample"}
                 </p>
                 <p className="mt-0.5 text-xs text-[#777b84]">
-                  Demo interaction · no audio plays
+                  Real FocusReader narration · 20 seconds
                 </p>
+
+                <div className="mt-3">
+                  <p className="text-[11px] text-[#777b84]">
+                    Choose a background that feels comfortable.
+                  </p>
+
+                  <div
+                    className="mt-2 flex max-w-md flex-wrap gap-1.5"
+                    role="group"
+                    aria-label="Background soundscape"
+                  >
+                    <button
+                      type="button"
+                      aria-pressed={selectedSoundscape === null}
+                      onClick={() => {
+                        selectedSoundscapeRef.current = null;
+                        setSelectedSoundscape(null);
+                        stopSoundscape();
+                      }}
+                      className={[
+                        "min-h-8 rounded-md border px-2.5 text-[11px] font-medium transition",
+                        selectedSoundscape === null
+                          ? "border-[#9db39b]/50 bg-[#9db39b]/[0.12] text-[#dce8da]"
+                          : "border-white/10 bg-white/[0.02] text-[#858993] hover:border-white/20 hover:text-[#d9d7cf]",
+                      ].join(" ")}
+                    >
+                      Off
+                    </button>
+
+                    {FOCUS_SOUNDSCAPE_PRESETS.map((preset) => {
+                      const active = selectedSoundscape === preset.id;
+
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          aria-pressed={active}
+                          title={preset.description}
+                          onClick={() => {
+                            selectedSoundscapeRef.current = preset.id;
+                            setSelectedSoundscape(preset.id);
+
+                            if (playing) {
+                              void getSoundscapeEngine().play(preset.id);
+                            }
+                          }}
+                          className={[
+                            "min-h-8 rounded-md border px-2.5 text-[11px] font-medium transition",
+                            active
+                              ? "border-[#9db39b]/50 bg-[#9db39b]/[0.12] text-[#dce8da]"
+                              : "border-white/10 bg-white/[0.02] text-[#858993] hover:border-white/20 hover:text-[#d9d7cf]",
+                          ].join(" ")}
+                        >
+                          {preset.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
               </div>
             </div>
           </div>
 
           <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
             <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#70747e]">
-              Session
+              Live demo
             </p>
+
             <div className="mt-5 space-y-5">
               <div>
-                <p className="text-2xl font-semibold tracking-[-0.04em] text-[#efeee9]">
-                  38%
+                <div className="flex items-center gap-2">
+                  <span
+                    aria-hidden="true"
+                    className={[
+                      "h-2 w-2 rounded-full",
+                      playing ? "bg-[#9db39b]" : "bg-[#666a73]",
+                    ].join(" ")}
+                  />
+                  <p className="text-sm font-medium text-[#dce8da]">
+                    {playing ? "Playing now" : "Ready to play"}
+                  </p>
+                </div>
+                <p className="mt-2 text-xs text-[#747881]">
+                  {duration > 0 ? `${formatTime(duration)} sample` : "Audio sample"}
                 </p>
-                <p className="mt-1 text-xs text-[#747881]">Reading complete</p>
               </div>
+
               <div className="h-px bg-white/[0.07]" />
+
               <div>
-                <p className="text-sm font-medium text-[#d5d4cf]">Place saved</p>
-                <p className="mt-1 text-xs leading-5 text-[#777b84]">
-                  Come back without finding your spot again.
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#70747e]">
+                  Background
+                </p>
+                <p className="mt-2 text-sm font-medium text-[#d5d4cf]">
+                  {selectedSoundscape === null
+                    ? "Off"
+                    : FOCUS_SOUNDSCAPE_PRESETS.find(
+                        (preset) => preset.id === selectedSoundscape
+                      )?.label ?? "Selected"}
                 </p>
               </div>
+
               <div className="h-px bg-white/[0.07]" />
-              <div className="flex items-center gap-2 text-xs text-[#969aa3]">
-                <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                Calm mode on
+
+              <div>
+                <p className="text-sm font-medium text-[#d5d4cf]">
+                  Your place is saved
+                </p>
+                <p className="mt-1 text-xs leading-5 text-[#777b84]">
+                  Return without searching for where you stopped.
+                </p>
               </div>
             </div>
           </div>
@@ -202,12 +562,12 @@ export default function LandingPage() {
   const reveal = {
     initial: reducedMotion
       ? { opacity: 1 }
-      : { opacity: 0, y: 18, filter: "blur(10px)" },
-    animate: { opacity: 1, y: 0, filter: "blur(0px)" },
+      : { opacity: 0, y: 12 },
+    animate: { opacity: 1, y: 0 },
   };
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-black text-[#efeee9] selection:bg-white/20">
+    <div className="landing-shell min-h-screen overflow-x-hidden bg-[#08090b] text-[#efeee9] selection:bg-[#9db39b]/30">
       <header className="relative z-50 mx-auto flex max-w-[1440px] items-center justify-between px-5 py-5 sm:px-8 lg:px-10">
         <Link href="/" className="flex items-center gap-3" aria-label="FocusReader home">
           <div className="flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/[0.05]">
@@ -247,25 +607,25 @@ export default function LandingPage() {
       </header>
 
       <main>
-        <section className="relative mx-auto grid min-h-[calc(100vh-80px)] max-w-[1440px] items-center gap-12 px-5 pb-16 pt-10 sm:px-8 sm:pt-16 lg:grid-cols-[0.82fr_1.18fr] lg:px-10 lg:pb-20 lg:pt-8">
-          <div className="relative z-10 max-w-[42rem]">
+        <section className="landing-hero relative mx-auto grid min-h-[calc(100vh-80px)] max-w-[1440px] items-center gap-10 px-5 pb-16 pt-4 sm:px-8 sm:pt-10 lg:grid-cols-[0.96fr_1.04fr] lg:px-10 lg:pb-16 lg:pt-0">
+          <div className="relative z-10 max-w-[47rem]">
             <motion.div
               {...reveal}
-              transition={{ duration: 0.75, ease }}
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.02] px-3.5 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#a4a7af]"
+              transition={{ duration: 0.42, ease }}
+              className="inline-flex items-center gap-2 rounded-full border border-[#9db39b]/25 bg-[#9db39b]/[0.07] px-3.5 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b8cbb6]"
             >
-              <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-              Reading, made listenable
+              <Sparkles className="h-3.5 w-3.5 text-[#9db39b]" aria-hidden="true" />
+              Listen · Follow · Finish
             </motion.div>
 
             <motion.h1
               {...reveal}
               transition={{
-                duration: 0.9,
+                duration: 0.5,
                 delay: reducedMotion ? 0 : 0.08,
                 ease,
               }}
-              className="mt-7 text-[clamp(3.2rem,7vw,6.6rem)] font-black leading-[0.92] tracking-[-0.055em] text-[#f4f3ef] antialiased"
+              className="mt-6 text-[clamp(3.1rem,5.6vw,5.7rem)] font-black leading-[0.94] tracking-[-0.05em] text-[#f4f3ef] antialiased"
             >
               Turn dense readings into audio you can actually finish.
             </motion.h1>
@@ -273,11 +633,11 @@ export default function LandingPage() {
             <motion.p
               {...reveal}
               transition={{
-                duration: 0.85,
+                duration: 0.48,
                 delay: reducedMotion ? 0 : 0.16,
                 ease,
               }}
-              className="mt-7 max-w-xl text-base leading-7 text-[#979aa3] sm:text-lg sm:leading-8"
+              className="mt-6 max-w-2xl text-base leading-7 text-[#b0b3bb] sm:text-lg sm:leading-8"
             >
               Upload a PDF, article, or study document and listen in a natural
               voice—without fighting through another wall of text.
@@ -286,16 +646,16 @@ export default function LandingPage() {
             <motion.div
               {...reveal}
               transition={{
-                duration: 0.85,
+                duration: 0.48,
                 delay: reducedMotion ? 0 : 0.24,
                 ease,
               }}
-              className="mt-8 flex flex-col items-start gap-4 sm:flex-row sm:items-center"
+              className="mt-7 flex flex-col items-start gap-3 sm:flex-row sm:items-center"
             >
               <PrimaryAction signedIn={Boolean(isSignedIn)} />
               <a
                 href="#how-it-works"
-                className="group inline-flex min-h-12 items-center gap-2 rounded-full px-2 text-sm font-medium text-[#a8abb3] transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                className="group inline-flex min-h-12 items-center gap-2 rounded-md border border-white/10 px-4 text-sm font-medium text-[#b8bbc2] transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:scale-[0.98] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
                 See how it works
                 <ChevronRight
@@ -312,7 +672,7 @@ export default function LandingPage() {
                 delay: reducedMotion ? 0 : 0.32,
                 ease,
               }}
-              className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-xs text-[#747882]"
+              className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-[13px] text-[#8f939c]"
             >
               {trustPoints.map((point) => (
                 <span key={point} className="flex items-center gap-2">
@@ -324,15 +684,16 @@ export default function LandingPage() {
           </div>
 
           <motion.div
+            className="lg:-translate-y-2 lg:scale-[1.03]"
             initial={
               reducedMotion
                 ? { opacity: 1 }
-                : { opacity: 0, x: 22, filter: "blur(12px)" }
+                : { opacity: 0, x: 24, scale: 0.985 }
             }
-            animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
             transition={{
-              duration: 1,
-              delay: reducedMotion ? 0 : 0.18,
+              duration: 0.58,
+              delay: reducedMotion ? 0 : 0.14,
               ease,
             }}
           >
@@ -371,6 +732,120 @@ export default function LandingPage() {
                   </p>
                 </article>
               ))}
+            </div>
+          </div>
+        </section>
+
+        <section
+          id="pricing"
+          className="border-b border-white/10 bg-white/[0.012]"
+        >
+          <div className="mx-auto max-w-[1440px] px-5 py-24 sm:px-8 lg:px-10 lg:py-32">
+            <div className="grid gap-12 lg:grid-cols-[0.8fr_1.2fr] lg:items-end">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#8da393]">
+                  Why FocusReader
+                </p>
+                <h2 className="mt-4 max-w-xl text-3xl font-black tracking-[-0.04em] text-[#f3f2ee] sm:text-5xl">
+                  More than text turned into audio.
+                </h2>
+                <p className="mt-5 max-w-xl text-base leading-7 text-[#8e929b]">
+                  Basic text-to-speech helps you hear the words. FocusReader is
+                  designed around staying connected to the reading while it plays.
+                </p>
+              </div>
+
+              <div className="overflow-hidden rounded-lg border border-white/10">
+                <div className="grid grid-cols-[1.25fr_1fr_1fr] bg-white/[0.04] px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#777b84] sm:px-6">
+                  <span>Experience</span>
+                  <span>FocusReader</span>
+                  <span>Basic TTS</span>
+                </div>
+
+                {comparisonRows.map((row) => (
+                  <div
+                    key={row.feature}
+                    className="grid grid-cols-[1.25fr_1fr_1fr] gap-3 border-t border-white/10 px-4 py-4 text-xs sm:px-6 sm:text-sm"
+                  >
+                    <span className="font-medium text-[#e5e4df]">
+                      {row.feature}
+                    </span>
+                    <span className="text-[#a8c0ad]">{row.focusReader}</span>
+                    <span className="text-[#747881]">{row.basicTts}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-24">
+              <div className="max-w-2xl">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#8da393]">
+                  Transparent beta pricing
+                </p>
+                <h2 className="mt-4 text-3xl font-black tracking-[-0.04em] text-[#f3f2ee] sm:text-5xl">
+                  Choose the commitment that fits.
+                </h2>
+                <p className="mt-5 text-sm leading-7 text-[#8e929b] sm:text-base">
+                  Every paid option includes 100,000 text-to-voice characters
+                  each month. No mystery pricing after signup.
+                </p>
+              </div>
+
+              <div className="mt-12 grid gap-4 lg:grid-cols-3">
+                {landingPlans.map((plan) => (
+                  <article
+                    key={plan.name}
+                    className={`relative flex min-h-[330px] flex-col rounded-lg border p-7 ${
+                      plan.badge === "Best value"
+                        ? "border-[#8da393]/60 bg-[#101512]"
+                        : "border-white/10 bg-[#0b0b0d]"
+                    }`}
+                  >
+                    {plan.badge && (
+                      <span className="absolute right-5 top-5 rounded-full border border-[#8da393]/35 bg-[#8da393]/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#aec3b2]">
+                        {plan.badge}
+                      </span>
+                    )}
+
+                    <p className="text-sm font-semibold text-[#d9d8d3]">
+                      {plan.name}
+                    </p>
+
+                    <div className="mt-10">
+                      <span className="text-4xl font-black tracking-[-0.04em] text-white">
+                        {plan.price}
+                      </span>
+                      <p className="mt-2 text-xs text-[#747881]">
+                        {plan.detail}
+                      </p>
+                    </div>
+
+                    <div className="mt-8 flex items-start gap-2 text-sm leading-6 text-[#9b9fa7]">
+                      <Check
+                        className="mt-1 h-4 w-4 shrink-0 text-[#9ab09f]"
+                        aria-hidden="true"
+                      />
+                      <span>{plan.note}</span>
+                    </div>
+
+                    <div className="mt-auto pt-10">
+                      <PricingAction
+                        signedIn={Boolean(isSignedIn)}
+                        label={
+                          plan.name === "Monthly"
+                            ? "Start monthly"
+                            : `Choose ${plan.name}`
+                        }
+                      />
+                    </div>
+                  </article>
+                ))}
+              </div>
+
+              <p className="mt-6 text-center text-xs text-[#686c74]">
+                Cancel recurring plans from your billing portal. Payments are
+                processed securely by Stripe.
+              </p>
             </div>
           </div>
         </section>

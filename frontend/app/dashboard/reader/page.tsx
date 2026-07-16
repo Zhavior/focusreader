@@ -323,13 +323,8 @@ export default function DocumentStudioPage() {
     if (!chunk) return null;
 
     const activeVoiceObj = NEURAL_VOICES[voiceIdx] || NEURAL_VOICES[0];
-    const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
-
-    // Try direct Node backend streaming first, fallback to Next.js API route
-    const endpoints = [
-      `${backendUrl}/api/tts/stream`,
-      "/api/extension-tts"
-    ];
+    // Keep backend credentials server-side through the authenticated TTS proxy.
+    const endpoints = ["/api/tts"];
 
     for (const endpoint of endpoints) {
       try {
@@ -337,7 +332,6 @@ export default function DocumentStudioPage() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-internal-secret": "19e27137daf824033518e83817c65c085e7dde1a31f209cf29f6b4914e65f4b7"
           },
           body: JSON.stringify({
             text: chunk.text,

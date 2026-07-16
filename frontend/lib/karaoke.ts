@@ -33,7 +33,16 @@ export function buildWordTimings(text: string): WordToken[] {
   for (const paragraph of paragraphs) {
     const words = paragraph.split(/\s+/).filter(Boolean);
     words.forEach((word, i) => {
-      raw.push({ word, weight: word.length + 1, paragraphStart: i === 0 });
+      // Hold the final word through the natural TTS pause before
+      // advancing into the next sentence.
+      const sentencePause = /[.!?][”’"')\]]*$/.test(word) ? 9 : 0;
+      const clausePause = /[,;:][”’"')\]]*$/.test(word) ? 2 : 0;
+
+      raw.push({
+        word,
+        weight: word.length + 1 + sentencePause + clausePause,
+        paragraphStart: i === 0,
+      });
     });
   }
 

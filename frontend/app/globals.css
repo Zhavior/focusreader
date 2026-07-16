@@ -43,8 +43,8 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  --font-sans: var(--font-sans);
-  --font-heading: var(--font-sans);
+  --font-sans: var(--font-outfit);
+  --font-heading: var(--font-inter-tight);
 
   /* Brand tokens for the Voice + billing UI. Kept separate from shadcn's
      neutral `accent` so both color systems coexist without collision. */
@@ -270,4 +270,102 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background-color: rgba(124, 92, 255, 0.4);
+}
+
+/* Landing demo: extension-style direct DOM karaoke updates */
+.landing-karaoke-word {
+  transition:
+    background-color 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    color 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.landing-karaoke-word.active {
+  background: rgba(157, 179, 155, 0.14);
+  color: #dce8da;
+  font-weight: 600;
+  transform: translateY(-1px);
+  box-shadow: 0 0 14px rgba(157, 179, 155, 0.16);
+}
+
+
+/* FocusReader landing material system */
+.landing-shell {
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(
+      circle at 82% 18%,
+      rgba(157, 179, 155, 0.075),
+      transparent 34rem
+    ),
+    radial-gradient(
+      circle at 12% 9%,
+      rgba(255, 255, 255, 0.035),
+      transparent 28rem
+    ),
+    linear-gradient(180deg, #090a0c 0%, #07080a 58%, #090a0c 100%);
+}
+
+.landing-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.018;
+  mix-blend-mode: soft-light;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.7'/%3E%3C/svg%3E");
+}
+
+.landing-shell > header,
+.landing-shell > main,
+.landing-shell > footer {
+  position: relative;
+  z-index: 1;
+}
+
+.landing-shell h1,
+.landing-shell h2 {
+  font-family: var(--font-inter-tight), var(--font-outfit), sans-serif;
+  text-wrap: balance;
+}
+
+.landing-hero::before {
+  content: "";
+  position: absolute;
+  inset: 5% -15% auto 44%;
+  height: 72%;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at center,
+    rgba(157, 179, 155, 0.055),
+    transparent 66%
+  );
+  filter: blur(28px);
+  z-index: -1;
+}
+
+@media (max-width: 767px) {
+  .landing-shell {
+    background:
+      radial-gradient(
+        circle at 78% 25%,
+        rgba(157, 179, 155, 0.07),
+        transparent 22rem
+      ),
+      radial-gradient(
+        circle at 5% 4%,
+        rgba(255, 255, 255, 0.03),
+        transparent 18rem
+      ),
+      linear-gradient(180deg, #090a0c 0%, #07080a 62%, #090a0c 100%);
+  }
+
+  .landing-hero::before {
+    inset: 34% -45% auto 12%;
+    height: 46%;
+    filter: blur(22px);
+  }
 }
