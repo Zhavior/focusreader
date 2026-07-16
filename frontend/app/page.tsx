@@ -386,9 +386,10 @@ function ReaderPreview() {
 
             <div
               ref={wordsRef}
-              className="mt-7 rounded-lg border border-white/10 bg-black/15 p-4 text-sm leading-7 text-[#91959f]"
+              className="landing-focus-passage mt-7 rounded-lg border border-white/10 bg-black/15 p-4 pl-7 text-sm leading-7 text-[#91959f]"
               aria-label={DEMO_TEXT}
             >
+              <span className="landing-focus-rail" aria-hidden="true" />
               {demoTokens.map((token, index) => (
                 <span key={`${token.word}-${index}`}>
                   <span
@@ -432,7 +433,7 @@ function ReaderPreview() {
                   {playing ? "Playing audio sample" : "Hear a short sample"}
                 </p>
                 <p className="mt-0.5 text-xs text-[#777b84]">
-                  Real FocusReader narration · 20 seconds
+                  Real FocusReader narration
                 </p>
 
                 <div className="mt-3">
@@ -541,10 +542,10 @@ function ReaderPreview() {
 
               <div>
                 <p className="text-sm font-medium text-[#d5d4cf]">
-                  Your place is saved
+                  Spoken-word follow-along
                 </p>
                 <p className="mt-1 text-xs leading-5 text-[#777b84]">
-                  Return without searching for where you stopped.
+                  The active word stays visible as narration moves.
                 </p>
               </div>
             </div>

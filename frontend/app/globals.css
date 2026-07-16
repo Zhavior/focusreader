@@ -369,3 +369,70 @@
     filter: blur(22px);
   }
 }
+
+
+/* FocusReader signature: moving margin + active sentence bracket */
+.landing-focus-passage {
+  position: relative;
+  overflow: hidden;
+}
+
+.landing-focus-rail {
+  position: absolute;
+  left: 0.75rem;
+  top: 1rem;
+  bottom: 1rem;
+  width: 2px;
+  border-radius: 999px;
+  background: rgba(157, 179, 155, 0.18);
+}
+
+.landing-focus-rail::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  height: 28%;
+  border-radius: inherit;
+  background: #9db39b;
+  box-shadow: 0 0 18px rgba(157, 179, 155, 0.32);
+  animation: landing-focus-rail-move 5.4s ease-in-out infinite alternate;
+}
+
+.landing-karaoke-word.active {
+  position: relative;
+}
+
+.landing-karaoke-word.active::before,
+.landing-karaoke-word.active::after {
+  position: absolute;
+  top: 50%;
+  color: rgba(157, 179, 155, 0.72);
+  font-weight: 500;
+  transform: translateY(-52%);
+}
+
+.landing-karaoke-word.active::before {
+  content: "[";
+  left: -0.42rem;
+}
+
+.landing-karaoke-word.active::after {
+  content: "]";
+  right: -0.42rem;
+}
+
+@keyframes landing-focus-rail-move {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(250%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-focus-rail::after {
+    animation: none;
+  }
+}
